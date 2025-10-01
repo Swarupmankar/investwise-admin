@@ -29,6 +29,7 @@ export interface KycDocumentsApi {
 }
 
 export interface UserInvestmentApi {
+  creationAnswers: boolean;
   id: number;
   name: string;
   amount: string;

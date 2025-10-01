@@ -55,3 +55,5 @@ export type CombinedPost = {
   raw?: NewsPost | NotificationItem;
   createdAt?: string;
 };
+
+export type NotificationsResponse = NotificationItem[];

@@ -18,19 +18,28 @@ import {
   Trash2,
 } from "lucide-react";
 
-export type KycItemStatus = "pending" | "approved" | "rejected";
+// Expanded union to include not_submitted
+export type KycItemStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "not_submitted";
 
 interface KYCDocumentItemProps {
   label: string;
   kind: "image" | "text";
-  value?: string;
+  value?: string | null;
   initialStatus?: KycItemStatus;
   rejectionReason?: string | null;
-  /** Called for approve / reject / delete. For approve we pass empty string as reason. */
-  onAction?: (action: "approve" | "reject" | "delete", notes?: string) => void;
+  /** Called for approve / reject. For approve we pass empty string as reason. */
+  onAction?: (action: "approve" | "reject", notes?: string) => void;
+  /** Called when user requests delete. Parent is expected to show confirmation modal. */
+  onDelete?: () => void;
   /** When true, component will disable interactive controls (parent is processing). */
   isProcessing?: boolean;
-  /** Show delete button only when true (KYCTab will set this when status === 'REJECTED') */
+  /** When true show per-item deleting indicator & disable delete button */
+  deleting?: boolean;
+  /** Show delete button only when true (KYCTab will set this when status === 'REJECTED' or file exists) */
   allowDelete?: boolean;
 }
 
@@ -41,7 +50,9 @@ export const KYCDocumentItem = ({
   initialStatus = "pending",
   rejectionReason,
   onAction,
+  onDelete,
   isProcessing = false,
+  deleting = false,
   allowDelete = false,
 }: KYCDocumentItemProps) => {
   // local status mirrors prop, but we DON'T set it locally on user click.
@@ -74,11 +85,14 @@ export const KYCDocumentItem = ({
 
   const handleDelete = () => {
     if (!allowDelete) return;
-    // simple confirm; replace with nicer modal if desired
-    const confirmed = confirm(`Delete ${label}? This action cannot be undone.`);
-    if (!confirmed) return;
-    onAction?.("delete");
+    // Delegate confirmation + actual deletion to parent so modal/UX is consistent
+    onDelete?.();
   };
+
+  const isNotSubmitted = status === "not_submitted";
+  const isPending = status === "pending";
+  const isApproved = status === "approved";
+  const isRejected = status === "rejected";
 
   return (
     <div className="rounded-lg border border-card-border bg-card p-4">
@@ -130,36 +144,43 @@ export const KYCDocumentItem = ({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={kind === "text" ? 6 : 5}
-            disabled={isProcessing}
+            disabled={isProcessing || isNotSubmitted}
           />
 
           <div className="flex flex-wrap gap-2 pt-1">
-            <Button
-              onClick={handleApprove}
-              className="flex-1 md:flex-none"
-              disabled={isProcessing}
-            >
-              <CheckCircle className="h-4 w-4 mr-2" /> Approve
-            </Button>
+            {/* Hide action buttons when document not submitted */}
+            {!isNotSubmitted && (
+              <>
+                <Button
+                  onClick={handleApprove}
+                  className="flex-1 md:flex-none"
+                  disabled={isProcessing || isApproved}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" /> Approve
+                </Button>
 
-            <Button
-              variant="destructive"
-              onClick={handleReject}
-              className="flex-1 md:flex-none"
-              disabled={isProcessing}
-            >
-              <XCircle className="h-4 w-4 mr-2" /> Reject
-            </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleReject}
+                  className="flex-1 md:flex-none"
+                  disabled={isProcessing || isRejected}
+                >
+                  <XCircle className="h-4 w-4 mr-2" /> Reject
+                </Button>
 
-            {allowDelete && (
-              <Button
-                variant="outline"
-                onClick={handleDelete}
-                className="flex-1 md:flex-none"
-                disabled={isProcessing}
-              >
-                <Trash2 className="h-4 w-4 mr-2" /> Delete
-              </Button>
+                {/* Single Delete button placed next to Reject (visible when allowed) */}
+                {allowDelete && value && (
+                  <Button
+                    variant="outline"
+                    onClick={handleDelete}
+                    className="flex-1 md:flex-none"
+                    disabled={isProcessing || deleting}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />{" "}
+                    {deleting ? "Deleting..." : "Delete"}
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -182,3 +203,5 @@ export const KYCDocumentItem = ({
     </div>
   );
 };
+
+export default KYCDocumentItem;

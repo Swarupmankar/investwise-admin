@@ -1,5 +1,5 @@
 // src/components/clients/tabs/KYCTab.tsx
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -19,7 +19,7 @@ import {
 import { UserApi } from "@/types/users/users.types";
 import { KycDocumentsApi } from "@/types/users/userDetail.types";
 
-type KycItemStatus = "pending" | "approved" | "rejected";
+type KycItemStatus = "pending" | "approved" | "rejected" | "not_submitted";
 
 interface KYCTabProps {
   client: UserApi;
@@ -32,18 +32,12 @@ export function KYCTab({ client }: KYCTabProps) {
   const [initialTitle, setInitialTitle] = useState<string | undefined>();
   const [initialMessage, setInitialMessage] = useState<string | undefined>();
 
-  // Helpful debug: show what the incoming client shape actually contains
   console.log("[KYCTab] mounted with client (raw):", client);
 
-  // If the server returned KYC nested in the client payload, use it directly.
-  // Many endpoints return `client.kycDocuments` (observed in your logs).
   const clientKycFromPayload: KycDocumentsApi | undefined = (client as any)
     ?.kycDocuments;
 
-  // Derive a numeric user id from a few possible locations:
-  // - client.id (preferred)
-  // - client.userId
-  // - clientKycFromPayload.userId (fallback, seen in your logs)
+  // derive numeric user id
   const derivedUserId = useMemo(() => {
     const possible =
       (client && (client as any).id) ??
@@ -59,8 +53,7 @@ export function KYCTab({ client }: KYCTabProps) {
     kycInClient: !!clientKycFromPayload,
   });
 
-  // If we already have KYC on the client object, skip making the network call.
-  // Otherwise, call the query using the derived id (or skip if we couldn't derive one).
+  // If we have kyc embedded in client payload or couldn't derive id, skip calling API.
   const shouldSkipQuery = !!clientKycFromPayload || !derivedUserId;
 
   const {
@@ -73,10 +66,21 @@ export function KYCTab({ client }: KYCTabProps) {
     skip: shouldSkipQuery,
   });
 
-  // Decide final `kyc` source: prefer payload, fallback to API response.
-  const kyc = clientKycFromPayload ?? (kycFromApi as any);
+  // Local editable copy of KYC used for UI updates when query is skipped (client payload)
+  const [localKyc, setLocalKyc] = useState<any | null>(null);
 
-  // Log what we got after the hook resolves (helpful to detect shape mismatch)
+  // Initialize localKyc when either the client payload or API response arrives
+  useEffect(() => {
+    if (clientKycFromPayload) {
+      setLocalKyc(clientKycFromPayload);
+    } else if (kycFromApi) {
+      setLocalKyc(kycFromApi);
+    }
+  }, [clientKycFromPayload, kycFromApi]);
+
+  // The kyc we actually render from
+  const kyc = localKyc;
+
   console.log("[KYCTab] hook result:", {
     shouldSkipQuery,
     kycLoading,
@@ -87,8 +91,12 @@ export function KYCTab({ client }: KYCTabProps) {
 
   const [reviewKycDocument, { isLoading: isReviewing }] =
     useReviewKycDocumentMutation();
-  const [deleteKycDocument, { isLoading: isDeleting }] =
+
+  const [deleteKycDocument, { isLoading: isDeletingGlobal }] =
     useDeleteKycDocumentMutation();
+
+  // Track which doc label is currently being deleted (per-item loading)
+  const [deletingLabel, setDeletingLabel] = useState<string | null>(null);
 
   const requestReupload = () =>
     toast({
@@ -106,7 +114,6 @@ export function KYCTab({ client }: KYCTabProps) {
     if (open) setMessageOpen(true);
   };
 
-  // Map UI label to API docType
   const docKeyFromLabel = (label: string): KycDocType | null => {
     switch (label) {
       case "Passport (Front)":
@@ -122,17 +129,16 @@ export function KYCTab({ client }: KYCTabProps) {
     }
   };
 
-  // Convert server status (any casing) to the narrow KycItemStatus union that KYCDocumentItem expects.
   const mapToKycItemStatus = (status?: string): KycItemStatus => {
-    if (!status) return "pending";
+    if (!status) return "not_submitted";
     const s = status.trim().toUpperCase();
     if (s === "APPROVED") return "approved";
     if (s === "REJECTED") return "rejected";
-    // treat everything else as pending
+    if (s === "NOT_SUBMITTED" || s === "NOT-SUBMITTED") return "not_submitted";
+    if (s === "PENDING") return "pending";
     return "pending";
   };
 
-  // Format date/time helpers
   const formatDate = (iso?: string) => {
     if (!iso) return "—";
     const d = new Date(iso);
@@ -143,41 +149,22 @@ export function KYCTab({ client }: KYCTabProps) {
     return `${month} ${day}, ${year}`;
   };
 
-  // Generic handler for approve/reject/delete actions coming from KYCDocumentItem
+  // Approve / Reject
   const handleDocumentAction = async (
     label: string,
-    action: "approve" | "reject" | "delete",
+    action: "approve" | "reject",
     notes?: string
   ) => {
     const docType = docKeyFromLabel(label);
-
     if (!docType) {
-      if (action === "delete") {
-        toast({
-          title: "Cannot delete",
-          description: "This item is not deletable.",
-        });
-      } else {
-        if (action === "approve") {
-          openTemplatedMessage(
-            `${label} Approved`,
-            `${label} has been approved.`,
-            true
-          );
-        } else {
-          openTemplatedMessage(
-            `${label} Rejected`,
-            notes ?? `${label} has been rejected.`,
-            true
-          );
-        }
-      }
+      toast({
+        title: "Cannot perform action",
+        description: "Unknown doc type",
+      });
       return;
     }
 
-    // Determine kycId to send to the review/delete mutations:
-    // prefer `kyc.id` from whatever source we have, otherwise fall back to derivedUserId.
-    const kycIdToUse = (kyc as any)?.id ?? derivedUserId;
+    const kycIdToUse = kyc?.id ?? derivedUserId;
     console.log("[KYCTab] handleDocumentAction ->", {
       label,
       action,
@@ -185,27 +172,6 @@ export function KYCTab({ client }: KYCTabProps) {
       docType,
       kycIdToUse,
     });
-
-    if (action === "delete") {
-      try {
-        await deleteKycDocument({
-          kycId: kycIdToUse ?? client.id ?? client.id,
-          body: { docType },
-        }).unwrap();
-        toast({
-          title: "Deleted",
-          description: `${label} deleted successfully.`,
-        });
-        refetchKyc();
-      } catch (err: any) {
-        console.error("Delete KYC doc failed:", err);
-        toast({
-          title: "Delete failed",
-          description: err?.data?.message ?? "Could not delete document.",
-        });
-      }
-      return;
-    }
 
     const apiAction: KycReviewAction =
       action === "approve" ? "APPROVE" : "REJECT";
@@ -220,7 +186,7 @@ export function KYCTab({ client }: KYCTabProps) {
 
     try {
       await reviewKycDocument({
-        kycId: kycIdToUse ?? client.id ?? client.id,
+        kycId: kycIdToUse ?? client.id,
         body: {
           documentType: docType,
           action: apiAction,
@@ -250,7 +216,36 @@ export function KYCTab({ client }: KYCTabProps) {
         );
       }
 
-      refetchKyc();
+      // If the query was started, refetch; otherwise update local state
+      if (!shouldSkipQuery && typeof refetchKyc === "function") {
+        try {
+          await refetchKyc();
+        } catch (e) {
+          console.warn("[KYCTab] refetchKyc failed:", e);
+        }
+      } else {
+        // simple local state update: set the status to APPROVED/REJECTED and set verified flag where appropriate
+        setLocalKyc((prev: any) => {
+          if (!prev) return prev;
+          const newPrev = { ...prev };
+          const statusStr = apiAction === "APPROVE" ? "APPROVED" : "REJECTED";
+          switch (docType) {
+            case "passportFront":
+              newPrev.passportFrontStatus = statusStr;
+              break;
+            case "passportBack":
+              newPrev.passportBackStatus = statusStr;
+              break;
+            case "selfieWithId":
+              newPrev.selfieWithIdStatus = statusStr;
+              break;
+            case "utilityBill":
+              newPrev.utilityBillStatus = statusStr;
+              break;
+          }
+          return newPrev;
+        });
+      }
     } catch (err: any) {
       console.error("Review KYC doc failed:", err);
       toast({
@@ -260,57 +255,148 @@ export function KYCTab({ client }: KYCTabProps) {
     }
   };
 
-  // Build the list of 4 documents; address (text) will be handled separately below as read-only
+  // Confirmation modal state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{
+    label: string;
+    docType: KycDocType;
+  } | null>(null);
+
+  // show confirm modal (called when user clicks Delete button on item)
+  const showDeleteConfirm = (label: string) => {
+    const docType = docKeyFromLabel(label);
+    if (!docType) {
+      toast({ title: "Cannot delete", description: "Unknown document type." });
+      return;
+    }
+    setPendingDelete({ label, docType });
+    setConfirmOpen(true);
+  };
+
+  // actual delete action (called when user confirms in modal)
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const { label, docType } = pendingDelete;
+    const kycIdToUse = kyc?.id ?? derivedUserId;
+    const resolvedKycId = kycIdToUse ?? client.id ?? (client as any).userId;
+    setDeletingLabel(label);
+    setConfirmOpen(false);
+
+    try {
+      console.log("[KYCTab] deleting document", { resolvedKycId, docType });
+      await deleteKycDocument({
+        kycId: resolvedKycId ?? "",
+        body: { docType },
+      }).unwrap();
+
+      toast({
+        title: "Deleted",
+        description: `${label} deleted successfully.`,
+      });
+
+      // If the API query was started (not skipped), refetch. Otherwise patch localKyc.
+      if (!shouldSkipQuery && typeof refetchKyc === "function") {
+        try {
+          await refetchKyc();
+        } catch (e) {
+          console.warn("[KYCTab] refetchKyc failed:", e);
+        }
+      } else {
+        // Patch local state to reflect deletion: remove value URL and set status to NOT_SUBMITTED
+        setLocalKyc((prev: any) => {
+          if (!prev) return prev;
+          const newPrev = { ...prev };
+          switch (docType) {
+            case "passportFront":
+              newPrev.passportFront = null;
+              newPrev.passportFrontStatus = "NOT_SUBMITTED";
+              newPrev.passportFrontRejectionReason = null;
+              break;
+            case "passportBack":
+              newPrev.passportBack = null;
+              newPrev.passportBackStatus = "NOT_SUBMITTED";
+              newPrev.passportBackRejectionReason = null;
+              break;
+            case "selfieWithId":
+              newPrev.selfieWithId = null;
+              newPrev.selfieWithIdStatus = "NOT_SUBMITTED";
+              newPrev.selfieWithIdRejectionReason = null;
+              break;
+            case "utilityBill":
+              newPrev.utilityBill = null;
+              newPrev.utilityBillStatus = "NOT_SUBMITTED";
+              newPrev.utilityBillRejectionReason = null;
+              break;
+          }
+          return newPrev;
+        });
+      }
+    } catch (err: any) {
+      console.error("Delete KYC doc failed:", err);
+      toast({
+        title: "Delete failed",
+        description: err?.data?.message ?? "Could not delete document.",
+      });
+    } finally {
+      setDeletingLabel(null);
+    }
+  };
+
+  // Build document list from current kyc (local)
   const documentItems = useMemo(() => {
     if (!kyc) return [];
 
-    const normalize = (s?: string) => (s ?? "PENDING").toUpperCase();
+    const frontStatusRaw =
+      kyc.passportFrontStatus ?? kyc.overallStatus ?? undefined;
+    const backStatusRaw =
+      kyc.passportBackStatus ?? kyc.overallStatus ?? undefined;
+    const selfieStatusRaw =
+      kyc.selfieWithIdStatus ?? kyc.overallStatus ?? undefined;
+    const utilityStatusRaw =
+      kyc.utilityBillStatus ?? kyc.overallStatus ?? undefined;
 
-    const frontStatus = normalize(
-      (kyc as any).passportFrontStatus ?? (kyc as any).overallStatus
-    );
-    const backStatus = normalize(
-      (kyc as any).passportBackStatus ?? (kyc as any).overallStatus
-    );
-    const selfieStatus = normalize(
-      (kyc as any).selfieWithIdStatus ?? (kyc as any).overallStatus
-    );
-    const utilityStatus = normalize(
-      (kyc as any).utilityBillStatus ?? (kyc as any).overallStatus
-    );
+    const has = (val: any) => !!val;
 
     return [
       {
         label: "Passport (Front)",
         kind: "image" as const,
-        value: (kyc as any).passportFront,
-        status: frontStatus,
-        rejectionReason: (kyc as any).passportFrontRejectionReason,
-        allowDelete: frontStatus === "REJECTED",
+        value: kyc.passportFront,
+        status: frontStatusRaw,
+        rejectionReason: kyc.passportFrontRejectionReason,
+        allowDelete:
+          has(kyc.passportFront) ||
+          String(frontStatusRaw).toUpperCase() === "REJECTED",
       },
       {
         label: "Passport (Back)",
         kind: "image" as const,
-        value: (kyc as any).passportBack,
-        status: backStatus,
-        rejectionReason: (kyc as any).passportBackRejectionReason,
-        allowDelete: backStatus === "REJECTED",
+        value: kyc.passportBack,
+        status: backStatusRaw,
+        rejectionReason: kyc.passportBackRejectionReason,
+        allowDelete:
+          has(kyc.passportBack) ||
+          String(backStatusRaw).toUpperCase() === "REJECTED",
       },
       {
         label: "Selfie with ID",
         kind: "image" as const,
-        value: (kyc as any).selfieWithId,
-        status: selfieStatus,
-        rejectionReason: (kyc as any).selfieWithIdRejectionReason,
-        allowDelete: selfieStatus === "REJECTED",
+        value: kyc.selfieWithId,
+        status: selfieStatusRaw,
+        rejectionReason: kyc.selfieWithIdRejectionReason,
+        allowDelete:
+          has(kyc.selfieWithId) ||
+          String(selfieStatusRaw).toUpperCase() === "REJECTED",
       },
       {
         label: "Utility / Address Proof",
         kind: "image" as const,
-        value: (kyc as any).utilityBill,
-        status: utilityStatus,
-        rejectionReason: (kyc as any).utilityBillRejectionReason,
-        allowDelete: utilityStatus === "REJECTED",
+        value: kyc.utilityBill,
+        status: utilityStatusRaw,
+        rejectionReason: kyc.utilityBillRejectionReason,
+        allowDelete:
+          has(kyc.utilityBill) ||
+          String(utilityStatusRaw).toUpperCase() === "REJECTED",
       },
     ];
   }, [kyc]);
@@ -334,30 +420,29 @@ export function KYCTab({ client }: KYCTabProps) {
             <>
               <div className="mt-6 space-y-4">
                 {documentItems.map((doc) => (
-                  <div key={doc.label}>
+                  <div key={doc.label} className="border-b pb-4">
                     <KYCDocumentItem
                       label={doc.label}
                       kind={doc.kind}
                       value={doc.value}
-                      // map the server status into the exact union type KYCDocumentItem expects
-                      initialStatus={mapToKycItemStatus(doc.status)}
+                      initialStatus={mapToKycItemStatus(doc.status as string)}
                       rejectionReason={doc.rejectionReason}
                       allowDelete={doc.allowDelete}
-                      onAction={(
-                        action: "approve" | "reject" | "delete",
-                        notes?: string
-                      ) => handleDocumentAction(doc.label, action, notes)}
-                      isProcessing={isReviewing || isDeleting}
+                      onAction={async (action, notes) => {
+                        await handleDocumentAction(doc.label, action, notes);
+                      }}
+                      onDelete={() => showDeleteConfirm(doc.label)}
+                      isProcessing={isReviewing || deletingLabel === doc.label}
+                      deleting={deletingLabel === doc.label}
                     />
-
                     {doc.label === "Utility / Address Proof" && (
                       <div className="mt-3 ml-4 p-3 rounded-md border bg-muted/50">
                         <div className="text-xs text-muted-foreground mb-1">
                           Address (read-only)
                         </div>
                         <div className="text-sm break-words whitespace-pre-wrap">
-                          {(kyc as any).address ? (
-                            (kyc as any).address
+                          {kyc.address ? (
+                            kyc.address
                           ) : (
                             <span className="text-muted-foreground">
                               No address provided
@@ -384,22 +469,57 @@ export function KYCTab({ client }: KYCTabProps) {
             <li>
               Submitted •{" "}
               <div className="inline-block ml-2">
-                <div>{formatDate((kyc as any)?.createdAt)}</div>
+                <div>{formatDate(kyc?.createdAt)}</div>
               </div>
             </li>
             <li>
               Reviewed •{" "}
               <div className="inline-block ml-2">
-                <div>{formatDate((kyc as any)?.reviewedAt)}</div>
+                <div>{formatDate(kyc?.reviewedAt)}</div>
               </div>
             </li>
             <li>
-              Current status •{" "}
-              {(kyc as any)?.overallStatus ?? (client as any).kycStatus}
+              Current status • {kyc?.overallStatus ?? (client as any).kycStatus}
             </li>
           </ul>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Modal */}
+      {confirmOpen && pendingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setConfirmOpen(false)}
+            aria-hidden
+          />
+          <div className="relative bg-white rounded-lg shadow-lg p-6 w-full max-w-md z-10">
+            <h3 className="text-lg font-semibold">Delete document</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Are you sure you want to delete{" "}
+              <strong>{pendingDelete.label}</strong>? This action is
+              irreversible.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                className="px-3 py-1 rounded border"
+                onClick={() => {
+                  setConfirmOpen(false);
+                  setPendingDelete(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-3 py-1 rounded bg-red-600 text-white"
+                onClick={confirmDelete}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <MessageModal
         open={messageOpen}
@@ -413,3 +533,5 @@ export function KYCTab({ client }: KYCTabProps) {
     </div>
   );
 }
+
+export default KYCTab;

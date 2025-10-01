@@ -1,7 +1,6 @@
 // src/API/kyc.api.ts
 import { baseApi } from "./baseApi";
 import type {
-  KycResponse,
   KycRecord,
   KycActionResponse,
   KycReviewRequestBody,

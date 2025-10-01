@@ -15,7 +15,10 @@ import { ReferralsTab } from "@/components/clients/tabs/ReferralsTab";
 import { QuestionnairesTab } from "@/components/clients/tabs/QuestionnairesTab";
 import { MessagesTab } from "@/components/clients/tabs/MessagesTab";
 import { useGetUserByIdQuery } from "@/API/users.api";
-import type { UserDetailApi } from "@/types/users/userDetail.types";
+import type {
+  UserDetailApi,
+  UserInvestmentApi,
+} from "@/types/users/userDetail.types";
 
 const ClientProfile = () => {
   const { id } = useParams<{ id: string }>();
@@ -74,14 +77,12 @@ const ClientProfile = () => {
       </DashboardLayout>
     );
   }
-  console.log("[ClientProfile] Loaded client:", client);
 
   const investments = client.userInvestments ?? [];
   const deposits = client.depositRequests ?? [];
   const withdrawals = client.withdrawRequests ?? [];
   const referrals = client.Referral ? [client.Referral] : [];
   const messages = client.userNotificationRecipient ?? [];
-  const registrationAnswers = client.onboardingAnswers ?? [];
   const updateInvestmentStatus = async (
     _investmentId: number | string,
     _status: string
@@ -151,21 +152,23 @@ const ClientProfile = () => {
 
                   <TabsContent value="referrals">
                     <ReferralsTab
-                      referrals={referrals}
+                      userId={numericId}
                       clientName={`${client.firstName} ${client.lastName}`}
                     />
                   </TabsContent>
 
                   <TabsContent value="questionnaires">
                     <QuestionnairesTab
-                      registrationAnswers={registrationAnswers}
-                      investments={investments}
+                      userId={numericId}
+                      investments={
+                        investments as unknown as UserInvestmentApi[]
+                      }
                     />
                   </TabsContent>
 
                   <TabsContent value="messages">
                     <MessagesTab
-                      messages={messages}
+                      userId={numericId}
                       onCompose={() => setMessageModalOpen(true)}
                     />
                   </TabsContent>
@@ -180,6 +183,7 @@ const ClientProfile = () => {
           open={messageModalOpen}
           onOpenChange={setMessageModalOpen}
           clientName={`${client.firstName} ${client.lastName}`}
+          clientId={numericId}
           messages={messages}
         />
       </div>

@@ -1,7 +1,12 @@
 // src/API/broadcast.api.ts
-import { NewsPost, NotificationItem } from "@/types/broadcast/news.types";
+import {
+  NewsPost,
+  NotificationItem,
+  NotificationsResponse,
+} from "@/types/broadcast/news.types";
 import { baseApi } from "./baseApi";
 import { ENDPOINTS } from "@/constants/apiEndpoints";
+import { AdminMessage } from "@/types/client";
 
 export const broadcastApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
@@ -34,6 +39,24 @@ export const broadcastApi = baseApi.injectEndpoints({
     getAllNotifications: build.query<NotificationItem[], void>({
       query: () => ({
         url: ENDPOINTS.BROADCAST.ALL_NOTIFICATIONS,
+        method: "GET",
+      }),
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((r) => ({
+                type: "Notification" as const,
+                id: r.id,
+              })),
+              { type: "Notification" as const, id: "LIST" },
+            ]
+          : [{ type: "Notification" as const, id: "LIST" }],
+    }),
+
+    // GET NOTIFICATION BY ID
+    getNotificationsByUserId: build.query<NotificationItem[], number | string>({
+      query: (id) => ({
+        url: ENDPOINTS.USERS.USER_MESSAGE(id),
         method: "GET",
       }),
       providesTags: (result) =>
@@ -133,4 +156,5 @@ export const {
   useDeleteNotificationMutation,
   useEditReportMutation,
   useDeleteReportMutation,
+  useGetNotificationsByUserIdQuery,
 } = broadcastApi;

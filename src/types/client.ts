@@ -42,7 +42,6 @@ export interface Investment {
   startDate: string;
   status: "active" | "completed" | "paused";
   returnCredited: number;
-  // Investment creation questionnaire answers (mock)
   creationAnswers?: QA[];
 }
 
