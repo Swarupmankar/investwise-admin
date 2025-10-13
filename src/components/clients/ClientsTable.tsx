@@ -34,6 +34,7 @@ export const ClientsTable = ({ clients }: ClientsTableProps) => {
             <TableHead>KYC Status</TableHead>
             <TableHead className="text-right">Total Deposited</TableHead>
             <TableHead className="text-right">Total Invested</TableHead>
+            <TableHead className="text-right">User Investments</TableHead>
             <TableHead className="text-right">Referral Earnings</TableHead>
             <TableHead className="text-right">Current Balance</TableHead>
             <TableHead>Status</TableHead>
@@ -60,6 +61,9 @@ export const ClientsTable = ({ clients }: ClientsTableProps) => {
               </TableCell>
               <TableCell className="text-right">
                 {formatCurrency(Number(client.totalInvested))}
+              </TableCell>
+              <TableCell className="text-right">
+                {Number(client.activeInvestmentsCount)}
               </TableCell>
               <TableCell className="text-right">
                 {formatCurrency(Number(client.referralEarnings))}

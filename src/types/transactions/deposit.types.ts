@@ -3,6 +3,7 @@ export interface DepositApi {
   userId: number;
   amount: string; // backend sends amounts as strings
   txId?: string | null;
+  depositWallet: string;
   proofUrl?: string | null;
   status: string;
   createdAt: string;
@@ -14,6 +15,7 @@ export interface DepositRequest {
   userId: number;
   amount: number;
   txid?: string | null;
+  depositWallet: string;
   screenshot?: string | null;
   status: string;
   submittedAt: string; // ISO

@@ -3,6 +3,7 @@ import { baseApi } from "./baseApi";
 import type {
   UserAnswersResponse,
   UserAnswerDto,
+  InvestmentAnswersItemResponse,
 } from "@/types/users/questionnaire.types";
 import { ENDPOINTS } from "@/constants/apiEndpoints";
 
@@ -53,9 +54,35 @@ export const questionnaireApi = baseApi.injectEndpoints({
             ]
           : [{ type: "Users" as const, id: "LIST" }],
     }),
+
+    getInvestmentAnswersByUserId: build.query<
+      InvestmentAnswersItemResponse,
+      { id: string | number }
+    >({
+      query: ({ id }) => ({
+        url: ENDPOINTS.USERS.INVESTMENT_QUESTIONS(id),
+        method: "GET",
+      }),
+      transformResponse: (res: unknown) => {
+        const raw = (res ?? {}) as InvestmentAnswersItemResponse;
+        const data = Array.isArray(raw.data)
+          ? raw.data.map((it) => ({
+              ...it,
+              investmentStatus: String(it.investmentStatus || "").toUpperCase(),
+            }))
+          : [];
+        return { data };
+      },
+      providesTags: (_res, _err, arg) => [
+        { type: "Users" as const, id: `CLIENTS:${arg.id}` },
+      ],
+    }),
   }),
   overrideExisting: false,
 });
 
-export const { useGetUserAnswersByUserIdQuery } = questionnaireApi;
+export const {
+  useGetUserAnswersByUserIdQuery,
+  useGetInvestmentAnswersByUserIdQuery,
+} = questionnaireApi;
 export default questionnaireApi;

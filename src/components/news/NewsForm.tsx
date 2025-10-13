@@ -264,42 +264,6 @@ export function NewsForm({ onPublish }: NewsFormProps) {
           )}
         </div>
 
-        <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
-          <Label className="text-base font-medium">Notification Settings</Label>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label htmlFor="notification-toggle">
-                Send notification to all users
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Users will receive an in-app notification
-              </p>
-            </div>
-            <Switch
-              id="notification-toggle"
-              checked={sendNotification}
-              onCheckedChange={setSendNotification}
-            />
-          </div>
-
-          {sendNotification && (
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label htmlFor="email-toggle">Also send via email</Label>
-                <p className="text-sm text-muted-foreground">
-                  Additionally send the announcement via email
-                </p>
-              </div>
-              <Switch
-                id="email-toggle"
-                checked={sendEmail}
-                onCheckedChange={setSendEmail}
-              />
-            </div>
-          )}
-        </div>
-
         <Button
           onClick={handlePublish}
           disabled={isPublishing || !title.trim() || !summary.trim()}

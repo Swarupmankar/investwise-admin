@@ -5,7 +5,10 @@ import {
   useUpdateDepositStatusMutation,
 } from "@/API/deposits.api";
 import { useGetAllUsersQuery } from "@/API/users.api";
-import type { DepositApi, DepositRequest } from "@/types/transactions/deposit";
+import type {
+  DepositApi,
+  DepositRequest,
+} from "@/types/transactions/deposit.types";
 
 /** safe parse to number */
 const toNumber = (v?: string | number | null) => {
@@ -79,6 +82,7 @@ export function useDepositsData() {
         clientEmail: user.email ?? "",
         amount: toNumber(d.amount),
         txid: (d as any).txId ?? (d as any).txid ?? null,
+        depositWallet: d.depositWallet ?? "",
         screenshot: (d as any).proofUrl ?? (d as any).screenshot ?? null,
         status: d.status ?? "",
         submittedAt: d.createdAt,

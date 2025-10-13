@@ -11,7 +11,7 @@ import type {
   Withdrawal,
   WithdrawFromType,
   CanonicalWithdrawStatus,
-} from "@/types/transactions/withdraw";
+} from "@/types/transactions/withdraw.types";
 
 /** safe parse to number */
 const toNumber = (v?: string | number | null) => {

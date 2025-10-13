@@ -12,6 +12,7 @@ export interface UserApi {
   referralEarnings: string;
   currentBalance: string;
   status: UserStatus;
+  activeInvestmentsCount: number;
 }
 
 export interface UsersMeta {

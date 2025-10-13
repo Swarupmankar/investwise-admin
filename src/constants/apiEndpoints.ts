@@ -5,6 +5,10 @@ export const ENDPOINTS = {
     REFERRAL: (id: number) => `/admin/clients/referral/${id}`,
     USER_ANSWERS: (id: number) => `/admin/clients/user-answers/${id}`,
     USER_MESSAGE: (id: number | string) => `/admin/notifications/user/${id}`,
+    PAUSE: (id: string | number) => `/admin/investments/pause/${id}`,
+    RESUME: (id: string | number) => `/admin/investments/resume/${id}`,
+    INVESTMENT_QUESTIONS: (id: string | number) =>
+      `/admin/clients/investment-answers/${id}`,
   },
 
   SUPPORT: {

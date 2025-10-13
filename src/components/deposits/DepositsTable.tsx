@@ -14,7 +14,7 @@ import { TXIDCopy } from "./TXIDCopy";
 import { ScreenshotPreview } from "./ScreenshotPreview";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { Eye } from "lucide-react";
-import { DepositRequest } from "@/types/transactions/deposit";
+import { DepositRequest } from "@/types/transactions/deposit.types";
 
 interface DepositsTableProps {
   deposits: DepositRequest[];
@@ -50,6 +50,7 @@ export function DepositsTable({
               <TableHead>Amount</TableHead>
               <TableHead>Submitted</TableHead>
               <TableHead>Transaction ID</TableHead>
+              <TableHead>Deposit Wallet</TableHead>
               <TableHead>Screenshot</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Actions</TableHead>
@@ -82,6 +83,11 @@ export function DepositsTable({
                 </TableCell>
                 <TableCell>
                   <TXIDCopy txid={deposit.txid} />
+                </TableCell>
+                <TableCell>
+                  <div className="text-sm text-muted-foreground">
+                    {deposit.depositWallet}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <ScreenshotPreview

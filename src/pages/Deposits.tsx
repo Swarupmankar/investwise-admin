@@ -4,7 +4,7 @@ import { DepositFilters } from "@/components/deposits/DepositFilters";
 import { DepositsTable } from "@/components/deposits/DepositsTable";
 import { DepositReviewModal } from "@/components/deposits/DepositReviewModal";
 import { useDepositsData } from "@/hooks/useDepositsData";
-import { DepositRequest } from "@/types/transactions/deposit";
+import { DepositRequest } from "@/types/transactions/deposit.types";
 
 export default function Deposits() {
   const { deposits, filters, setFilters, updateDepositStatus, stats } =

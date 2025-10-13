@@ -19,6 +19,7 @@ import type {
   UserDetailApi,
   UserInvestmentApi,
 } from "@/types/users/userDetail.types";
+import { UserApi } from "@/types/users/users.types";
 
 const ClientProfile = () => {
   const { id } = useParams<{ id: string }>();
@@ -130,7 +131,7 @@ const ClientProfile = () => {
               <div className="py-6">
                 <div className="container mx-auto space-y-6">
                   <TabsContent value="kyc">
-                    <KYCTab client={client as client} />
+                    <KYCTab client={client as unknown as UserApi} />
                   </TabsContent>
 
                   <TabsContent value="investments">

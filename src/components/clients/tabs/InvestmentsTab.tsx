@@ -1,5 +1,4 @@
-// src/components/clients/tabs/InvestmentsTab.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -19,9 +18,15 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate, formatPercentage } from "@/lib/formatters";
-import { Pause, CheckCircle2, Eye } from "lucide-react";
+import { Pause, Play, Eye } from "lucide-react";
 import { InvestmentDetailModal } from "@/components/clients/InvestmentDetailModal";
 import type { UserInvestmentApi } from "@/types/users/userDetail.types";
+
+import { useToast } from "@/hooks/use-toast";
+import {
+  usePauseInvestmentMutation,
+  useResumeInvestmentMutation,
+} from "@/API/users.api";
 
 /**
  * Helper: safely convert string|number|undefined to a number
@@ -54,6 +59,39 @@ export function InvestmentsTab({
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [openId, setOpenId] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  // RTK mutations
+  const [pauseInvestment] = usePauseInvestmentMutation();
+  const [resumeInvestment] = useResumeInvestmentMutation();
+
+  // track pending action per id
+  const [pendingForId, setPendingForId] = useState<number | string | null>(
+    null
+  );
+
+  // local map of statuses so UI can update immediately (optimistic)
+  const [statusById, setStatusById] = useState<Record<string, string>>({});
+
+  // Sync local status map whenever investments prop changes
+  useEffect(() => {
+    const map: Record<string, string> = {};
+    for (const inv of investments || []) {
+      if (inv?.id != null) map[String(inv.id)] = inv.investmentStatus ?? "";
+    }
+    setStatusById((prev) => {
+      // avoid unnecessary resets if identical
+      const keys = Object.keys(map);
+      const prevKeys = Object.keys(prev);
+      if (
+        prevKeys.length === keys.length &&
+        keys.every((k) => prev[k] === map[k])
+      ) {
+        return prev;
+      }
+      return map;
+    });
+  }, [investments]);
 
   const data = useMemo(() => {
     const q = norm(query).trim();
@@ -105,6 +143,52 @@ export function InvestmentsTab({
     const days = daysActiveThisMonth(i.createdAt ?? undefined);
     const daysInMonth = new Date().getDate() || 30;
     return toNumber(i.amount) * monthlyRoi * (days / daysInMonth);
+  };
+
+  // Toggle pause/resume using the appropriate API (optimistic UI)
+  const handleTogglePauseResume = async (
+    investmentId: number | string,
+    currentStatus?: string
+  ) => {
+    const key = String(investmentId);
+    const isPaused = norm(currentStatus) === "paused";
+    const newStatus = isPaused ? "active" : "paused"; // optimistic target
+    const action = isPaused ? "resume" : "pause";
+
+    // remember previous status for rollback if needed
+    const prevStatus = statusById[key] ?? currentStatus ?? "";
+    // optimistic update
+    setStatusById((s) => ({ ...s, [key]: newStatus }));
+    setPendingForId(investmentId);
+
+    try {
+      if (action === "pause") {
+        await pauseInvestment({ id: investmentId }).unwrap();
+        toast({
+          title: "Investment paused",
+          description: `Investment ${investmentId} was paused.`,
+        });
+        onChangeStatus?.(investmentId, "paused");
+      } else {
+        await resumeInvestment({ id: investmentId }).unwrap();
+        toast({
+          title: "Investment resumed",
+          description: `Investment ${investmentId} was resumed.`,
+        });
+        onChangeStatus?.(investmentId, "active");
+      }
+    } catch (err: any) {
+      // rollback on error
+      setStatusById((s) => ({ ...s, [key]: prevStatus }));
+      console.error("Pause/Resume failed:", err);
+      toast({
+        title: `${action === "pause" ? "Pause" : "Resume"} failed`,
+        description: err?.data?.message || err?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setPendingForId(null);
+    }
   };
 
   return (
@@ -207,78 +291,95 @@ export function InvestmentsTab({
               </TableHeader>
 
               <TableBody>
-                {data.map((i) => (
-                  <TableRow key={i.id}>
-                    <TableCell className="font-mono text-xs whitespace-nowrap">
-                      {i.id}
-                    </TableCell>
+                {data.map((i) => {
+                  const id = i.id;
+                  const isPending =
+                    pendingForId !== null &&
+                    String(pendingForId) === String(id);
+                  // prefer local status if present, otherwise use prop
+                  const currentStatus =
+                    statusById[String(id)] ?? i.investmentStatus;
+                  const isPaused = norm(currentStatus) === "paused";
 
-                    {/* Name: allow truncation */}
-                    <TableCell className="max-w-[250px] truncate">
-                      <div className="truncate">{i.name ?? "-"}</div>
-                    </TableCell>
+                  return (
+                    <TableRow key={id}>
+                      <TableCell className="font-mono text-xs whitespace-nowrap">
+                        {id}
+                      </TableCell>
 
-                    {/* Numeric: right aligned, no wrapping */}
-                    <TableCell className="text-right whitespace-nowrap">
-                      {formatCurrency(toNumber(i.amount))}
-                    </TableCell>
+                      {/* Name: allow truncation */}
+                      <TableCell className="max-w-[250px] truncate">
+                        <div className="truncate">{i.name ?? "-"}</div>
+                      </TableCell>
 
-                    <TableCell className="whitespace-nowrap">
-                      {formatDate(i.createdAt ?? "")}
-                    </TableCell>
+                      {/* Numeric: right aligned, no wrapping */}
+                      <TableCell className="text-right whitespace-nowrap">
+                        {formatCurrency(toNumber(i.amount))}
+                      </TableCell>
 
-                    <TableCell className="capitalize whitespace-nowrap">
-                      {capitalize(norm(i.investmentStatus))}
-                    </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {formatDate(i.createdAt ?? "")}
+                      </TableCell>
 
-                    <TableCell className="text-right whitespace-nowrap">
-                      {daysActiveThisMonth(i.createdAt)}
-                    </TableCell>
+                      <TableCell className="capitalize whitespace-nowrap">
+                        {capitalize(norm(currentStatus))}
+                      </TableCell>
 
-                    <TableCell className="text-right whitespace-nowrap">
-                      {formatCurrency(proratedReturn(i))}
-                    </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {daysActiveThisMonth(i.createdAt)}
+                      </TableCell>
 
-                    <TableCell className="text-right whitespace-nowrap">
-                      {formatCurrency(toNumber(i.returnsBalance))}
-                    </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {formatCurrency(toNumber(i.thisMonthsReturns))}
+                      </TableCell>
 
-                    <TableCell className="text-center whitespace-nowrap">
-                      <div className="inline-flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setOpenId(Number(i.id))}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {formatCurrency(toNumber(i.returnsBalance))}
+                      </TableCell>
 
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            onChangeStatus?.(
-                              i.id,
-                              norm(i.investmentStatus) === "paused"
-                                ? "active"
-                                : "paused"
-                            )
-                          }
-                        >
-                          <Pause className="h-4 w-4" />
-                        </Button>
+                      <TableCell className="text-center whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setOpenId(Number(i.id))}
+                            title="View details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
 
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => onChangeStatus?.(i.id, "completed")}
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              handleTogglePauseResume(i.id, currentStatus)
+                            }
+                            disabled={isPending}
+                            title={
+                              isPaused
+                                ? "Resume investment"
+                                : "Pause investment"
+                            }
+                          >
+                            {isPending ? (
+                              <span className="opacity-60">
+                                {isPaused ? (
+                                  <Play className="h-4 w-4" />
+                                ) : (
+                                  <Pause className="h-4 w-4" />
+                                )}
+                              </span>
+                            ) : isPaused ? (
+                              <Play className="h-4 w-4" />
+                            ) : (
+                              <Pause className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

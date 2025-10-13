@@ -50,6 +50,7 @@ export interface DepositRequestApi {
   userId: number;
   amount: string;
   txId: string;
+  depositWallet: string;
   proofUrl?: string | null;
   status: string;
   createdAt: string;

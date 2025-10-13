@@ -12,4 +12,20 @@ export type UserAnswerDto = {
   question: QuestionDto;
 };
 
-export type UserAnswersResponse = UserAnswerDto[]; // array of answers
+export type UserAnswersResponse = UserAnswerDto[];
+
+export type InvestmentStatus = "ACTIVE" | "PAUSED" | "COMPLETED" | string;
+
+export interface InvestmentAnswersItem {
+  id: number;
+  name: string;
+  forWhome: string;
+  duration: string;
+  amount: number;
+  investmentStatus: InvestmentStatus; // "ACTIVE" | "PAUSED" | etc.
+  referralCode: string | null;
+}
+
+export interface InvestmentAnswersItemResponse {
+  data: InvestmentAnswersItem[];
+}

@@ -24,7 +24,6 @@ export interface Client {
     addressProof?: KycItemReview;
     addressText?: KycItemReview;
   };
-  // Registration questionnaire answers (mock data)
   registrationAnswers?: QA[];
 }
 
@@ -71,7 +70,6 @@ export interface Referral {
   referrerId: string;
   referredClientId: string;
   referredClientName: string;
-  // Additional details about the referred user and investment
   referredClientBalance?: number;
   referredClientTotalInvested?: number;
   referredInvestmentId?: string;
@@ -105,3 +103,12 @@ export interface AdminNote {
   createdAt: string;
   createdBy: string;
 }
+
+export interface PauseResumeResponse {
+  message?: string;
+  success?: boolean;
+}
+
+export type PauseResumeRequest = {
+  id: string | number;
+};

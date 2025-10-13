@@ -4,10 +4,15 @@ export interface Transaction {
   clientName: string;
   clientEmail: string;
   clientId: string;
-  type: "deposit" | "withdrawal-return" | "withdrawal-referral" | "withdrawal-principal";
+  type:
+    | "deposit"
+    | "withdrawal-return"
+    | "withdrawal-referral"
+    | "withdrawal-principal";
   amount: number;
   status: "pending" | "approved" | "rejected" | "completed";
   walletAddress?: string;
+  depositWallet?: string | null;
   txid?: string;
   screenshot?: string;
   adminMessage?: string;

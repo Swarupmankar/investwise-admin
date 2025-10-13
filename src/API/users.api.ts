@@ -3,6 +3,7 @@ import { ENDPOINTS } from "@/constants/apiEndpoints";
 import { baseApi } from "./baseApi";
 import type { UserApi } from "@/types/users/users.types";
 import { UserDetailApi } from "@/types/users/userDetail.types";
+import { PauseResumeRequest, PauseResumeResponse } from "@/types/client";
 
 export const usersApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
@@ -42,8 +43,39 @@ export const usersApi = baseApi.injectEndpoints({
       }),
       providesTags: (_res, _err, id) => [{ type: "Users" as const, id }],
     }),
+
+    pauseInvestment: build.mutation<PauseResumeResponse, PauseResumeRequest>({
+      query: ({ id }) => ({
+        url: ENDPOINTS.USERS.PAUSE(id),
+        method: "GET",
+      }),
+      // Invalidate investment list or specific id so UI can refetch updated data
+      invalidatesTags: (_res, _err, arg) => [
+        { type: "Investment" as const, id: "LIST" },
+        { type: "Investment" as const, id: String(arg.id) },
+      ],
+      transformResponse: (res: unknown) => (res ?? {}) as PauseResumeResponse,
+    }),
+
+    // Resume investment
+    resumeInvestment: build.mutation<PauseResumeResponse, PauseResumeRequest>({
+      query: ({ id }) => ({
+        url: ENDPOINTS.USERS.RESUME(id),
+        method: "GET",
+      }),
+      invalidatesTags: (_res, _err, arg) => [
+        { type: "Investment" as const, id: "LIST" },
+        { type: "Investment" as const, id: String(arg.id) },
+      ],
+      transformResponse: (res: unknown) => (res ?? {}) as PauseResumeResponse,
+    }),
   }),
   overrideExisting: false,
 });
 
-export const { useGetAllUsersQuery, useGetUserByIdQuery } = usersApi;
+export const {
+  useGetAllUsersQuery,
+  useGetUserByIdQuery,
+  usePauseInvestmentMutation,
+  useResumeInvestmentMutation,
+} = usersApi;

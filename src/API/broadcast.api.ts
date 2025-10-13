@@ -1,12 +1,7 @@
 // src/API/broadcast.api.ts
-import {
-  NewsPost,
-  NotificationItem,
-  NotificationsResponse,
-} from "@/types/broadcast/news.types";
+import { NewsPost, NotificationItem } from "@/types/broadcast/news.types";
 import { baseApi } from "./baseApi";
 import { ENDPOINTS } from "@/constants/apiEndpoints";
-import { AdminMessage } from "@/types/client";
 
 export const broadcastApi = baseApi.injectEndpoints({
   endpoints: (build) => ({

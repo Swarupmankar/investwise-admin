@@ -17,7 +17,7 @@ import { ScreenshotPreview } from "./ScreenshotPreview";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, XCircle, User, Mail, Hash } from "lucide-react";
-import { DepositRequest } from "@/types/transactions/deposit";
+import { DepositRequest } from "@/types/transactions/deposit.types";
 
 interface DepositReviewModalProps {
   deposit: DepositRequest | null;
@@ -201,6 +201,19 @@ export function DepositReviewModal({
                   <div className="mt-1">
                     {deposit.txid ? (
                       <TXIDCopy txid={deposit.txid} showFullTxid />
+                    ) : (
+                      <div className="text-sm text-muted-foreground">—</div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-muted-foreground">
+                    Transaction ID
+                  </Label>
+                  <div className="mt-1">
+                    {deposit.depositWallet ? (
+                      <TXIDCopy txid={deposit.depositWallet} showFullTxid />
                     ) : (
                       <div className="text-sm text-muted-foreground">—</div>
                     )}

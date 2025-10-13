@@ -1,4 +1,3 @@
-// src/components/clients/tabs/KYCTab.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Card,
@@ -75,8 +74,11 @@ export function KYCTab({ client }: KYCTabProps) {
       setLocalKyc(clientKycFromPayload);
     } else if (kycFromApi) {
       setLocalKyc(kycFromApi);
+    } else if (!kycLoading && !kycError) {
+      // No record coming from API and not loading/error -> explicitly set null
+      setLocalKyc(null);
     }
-  }, [clientKycFromPayload, kycFromApi]);
+  }, [clientKycFromPayload, kycFromApi, kycLoading, kycError]);
 
   // The kyc we actually render from
   const kyc = localKyc;
@@ -85,6 +87,7 @@ export function KYCTab({ client }: KYCTabProps) {
     shouldSkipQuery,
     kycLoading,
     kycError,
+    error,
     kycFromApi,
     kycUsed: kyc,
   });
@@ -97,12 +100,6 @@ export function KYCTab({ client }: KYCTabProps) {
 
   // Track which doc label is currently being deleted (per-item loading)
   const [deletingLabel, setDeletingLabel] = useState<string | null>(null);
-
-  const requestReupload = () =>
-    toast({
-      title: "Re-upload requested",
-      description: "The client was asked to re-upload documents.",
-    });
 
   const openTemplatedMessage = (
     title: string,
@@ -186,7 +183,7 @@ export function KYCTab({ client }: KYCTabProps) {
 
     try {
       await reviewKycDocument({
-        kycId: kycIdToUse ?? client.id,
+        kycId: kycIdToUse ?? (client as any).id,
         body: {
           documentType: docType,
           action: apiAction,
@@ -278,7 +275,8 @@ export function KYCTab({ client }: KYCTabProps) {
     if (!pendingDelete) return;
     const { label, docType } = pendingDelete;
     const kycIdToUse = kyc?.id ?? derivedUserId;
-    const resolvedKycId = kycIdToUse ?? client.id ?? (client as any).userId;
+    const resolvedKycId =
+      kycIdToUse ?? (client as any).id ?? (client as any).userId;
     setDeletingLabel(label);
     setConfirmOpen(false);
 
@@ -401,6 +399,23 @@ export function KYCTab({ client }: KYCTabProps) {
     ];
   }, [kyc]);
 
+  // ----- NEW: helpers for clearer UI states -----
+  const httpStatus = (error as any)?.status;
+  const notFound =
+    kycError &&
+    (httpStatus === 404 || (error as any)?.data?.code === "NOT_FOUND");
+
+  const hasAnyDoc =
+    !!kyc &&
+    !!(
+      kyc.passportFront ||
+      kyc.passportBack ||
+      kyc.selfieWithId ||
+      kyc.utilityBill
+    );
+
+  const noDocsState = (!kycLoading && !kycError && !hasAnyDoc) || notFound;
+
   return (
     <div className="space-y-6">
       <Card>
@@ -412,9 +427,22 @@ export function KYCTab({ client }: KYCTabProps) {
         <CardContent>
           {kycLoading ? (
             <div className="py-6 text-center text-sm">Loading KYC...</div>
-          ) : kycError || !kyc ? (
-            <div className="py-6 text-center text-sm text-red-600">
-              Could not load KYC record. Try refreshing the page.
+          ) : kycError && !notFound ? (
+            <div className="py-6 text-center">
+              <div className="text-sm text-red-600">
+                Failed to load KYC.{" "}
+                {httpStatus ? `(Error ${httpStatus})` : null}
+              </div>
+              <button
+                className="mt-3 px-3 py-1.5 text-sm rounded border"
+                onClick={() => refetchKyc && refetchKyc()}
+              >
+                Retry
+              </button>
+            </div>
+          ) : noDocsState ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              No KYC documents uploaded yet.
             </div>
           ) : (
             <>
@@ -465,23 +493,36 @@ export function KYCTab({ client }: KYCTabProps) {
           <CardDescription>Key KYC events</CardDescription>
         </CardHeader>
         <CardContent>
-          <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
-            <li>
-              Submitted •{" "}
-              <div className="inline-block ml-2">
-                <div>{formatDate(kyc?.createdAt)}</div>
-              </div>
-            </li>
-            <li>
-              Reviewed •{" "}
-              <div className="inline-block ml-2">
-                <div>{formatDate(kyc?.reviewedAt)}</div>
-              </div>
-            </li>
-            <li>
-              Current status • {kyc?.overallStatus ?? (client as any).kycStatus}
-            </li>
-          </ul>
+          {kycLoading ? (
+            <div className="py-3 text-sm text-muted-foreground">Loading…</div>
+          ) : kycError && !notFound ? (
+            <div className="py-3 text-sm text-red-600">
+              Unable to load audit trail.
+            </div>
+          ) : noDocsState ? (
+            <div className="py-3 text-sm text-muted-foreground">
+              No audit trail yet — the client hasn’t uploaded any KYC documents.
+            </div>
+          ) : (
+            <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+              <li>
+                Submitted •{" "}
+                <div className="inline-block ml-2">
+                  <div>{formatDate(kyc?.createdAt)}</div>
+                </div>
+              </li>
+              <li>
+                Reviewed •{" "}
+                <div className="inline-block ml-2">
+                  <div>{formatDate(kyc?.reviewedAt)}</div>
+                </div>
+              </li>
+              <li>
+                Current status •{" "}
+                {kyc?.overallStatus ?? (client as any).kycStatus}
+              </li>
+            </ul>
+          )}
         </CardContent>
       </Card>
 
@@ -524,8 +565,13 @@ export function KYCTab({ client }: KYCTabProps) {
       <MessageModal
         open={messageOpen}
         onOpenChange={setMessageOpen}
-        clientName={client.name}
-        clientId={client.id}
+        clientName={
+          (client as any).name ??
+          `${(client as any).firstName ?? ""} ${
+            (client as any).lastName ?? ""
+          }`.trim()
+        }
+        clientId={(client as any).id ?? (client as any).userId}
         messages={[]}
         initialTitle={initialTitle}
         initialMessage={initialMessage}

@@ -1,6 +1,6 @@
 import { ENDPOINTS } from "@/constants/apiEndpoints";
 import { baseApi } from "./baseApi";
-import type { DepositApi } from "@/types/transactions/deposit";
+import type { DepositApi } from "@/types/transactions/deposit.types";
 
 export const depositsApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
@@ -27,6 +27,7 @@ export const depositsApi = baseApi.injectEndpoints({
           : [{ type: "Deposits", id: "LIST" }],
     }),
 
+    // status can be "APPROVED" | "REJECTED"
     updateDepositStatus: build.mutation<
       any,
       { transactionId: number; status: "APPROVED" | "REJECTED" }

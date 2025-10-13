@@ -1,4 +1,3 @@
-// src/pages/Clients.tsx
 import { useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ClientsTable } from "@/components/clients/ClientsTable";
@@ -7,7 +6,22 @@ import { useGetAllUsersQuery } from "@/API/users.api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { UserApi } from "@/types/users/users.types";
+import type { UserApi, UserStatus } from "@/types/users/users.types";
+
+// 🧠 Helper: safely convert any type (Decimal, number, null) into string
+const safeToString = (v: any): string => {
+  if (v == null) return "0";
+  if (typeof v === "object" && typeof v.toString === "function") {
+    return v.toString();
+  }
+  if (typeof v === "number") return String(v);
+  if (typeof v === "string") return v;
+  try {
+    return String(v);
+  } catch {
+    return "0";
+  }
+};
 
 export default function Clients() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -17,6 +31,7 @@ export default function Clients() {
   const [toasts, setToasts] = useState<
     { id: string; type: "error" | "success" | "info"; message: string }[]
   >([]);
+
   const addToast = (
     type: "error" | "success" | "info",
     message: string,
@@ -35,38 +50,60 @@ export default function Clients() {
     refetch,
   } = useGetAllUsersQuery(undefined, { refetchOnMountOrArgChange: false });
 
-  const allApiUsers = usersResponse ?? [];
+  // 🧭 Normalize backend response shape
+  const rawApiPayload = usersResponse ?? null;
+  const allApiUsers = Array.isArray(rawApiPayload)
+    ? rawApiPayload
+    : Array.isArray((rawApiPayload as any)?.data)
+    ? (rawApiPayload as any).data
+    : [];
 
+  // 🧮 Normalize users from API into your frontend type
   const allClients: UserApi[] = useMemo(() => {
     return (allApiUsers || []).map((u: any) => {
-      const createdAt = u.createdAt ?? new Date().toISOString();
-      const updatedAt = u.updatedAt ?? createdAt;
-
-      const client: Partial<UserApi> = {
-        id: typeof u.id === "number" ? u.id : Number(u.id),
-        name: u.name ?? `User ${u.id}`,
-        email: u.email,
-        phoneNumber: u.phoneNumber ?? null,
-        kycStatus: u.kycStatus ?? null,
-        totalDeposited: u.totalDeposited ?? "0",
-        totalInvested: u.totalInvested ?? "0",
-        referralEarnings: u.referralEarnings ?? "0",
-        currentBalance: u.currentBalance ?? "0",
-        status: u.status ?? "active",
+      const client: UserApi = {
+        id: typeof u.id === "number" ? u.id : Number(u.id ?? 0),
+        name:
+          u.name ??
+          (`${(u.firstName ?? "").trim()} ${(
+            u.lastName ?? ""
+          ).trim()}`.trim() ||
+            `User ${u.id ?? ""}`),
+        email: u.email ?? "",
+        phoneNumber: u.phoneNumber ?? "",
+        kycStatus: u.kycStatus ?? "",
+        totalDeposited: safeToString(
+          u.totalDeposited ?? u.totalDeposited?.toString?.() ?? "0"
+        ),
+        totalInvested: safeToString(
+          u.totalInvested ?? u.totalInvested?.toString?.() ?? "0"
+        ),
+        referralEarnings: safeToString(
+          u.referralEarnings ?? u.Referral?.earningsBalance ?? "0"
+        ),
+        currentBalance: safeToString(
+          u.currentBalance ?? u.fundsAvailable ?? "0"
+        ),
+        status: (u.status ?? "active") as UserStatus,
+        activeInvestmentsCount:
+          typeof u.activeInvestmentsCount === "number"
+            ? u.activeInvestmentsCount
+            : Number(u.activeInvestmentsCount ?? 0),
       };
-
-      return client as UserApi;
+      return client;
     });
   }, [allApiUsers]);
 
+  // 🔍 Filtering logic (same as before)
   const clients = useMemo(() => {
     return allClients.filter((c) => {
-      // STATUS filter: allow 'all' or match backend status (active | archived | dormant)
+      // STATUS filter
       if (statusFilter !== "all") {
         const status = (c.status ?? "").toString().toLowerCase();
         if (status !== statusFilter.toLowerCase()) return false;
       }
 
+      // KYC filter
       if (kycFilter !== "all") {
         const kyc = (c.kycStatus ?? "").toString().toLowerCase().trim();
         const kycFilterNormalized = kycFilter.toLowerCase().trim();
@@ -75,17 +112,15 @@ export default function Clients() {
           kycFilterNormalized === "not submitted" ||
           kycFilterNormalized === "not_submitted"
         ) {
-          // treat null / empty / not_submitted / not submitted as Not submitted
           if (kyc && kyc !== "not submitted" && kyc !== "not_submitted") {
             return false;
           }
         } else {
-          // pending / approved / rejected — strict match
           if (kyc !== kycFilterNormalized) return false;
         }
       }
 
-      // SEARCH filter (name, email, phone, id)
+      // SEARCH filter
       if (!searchTerm.trim()) return true;
       const q = searchTerm.toLowerCase();
       return (
@@ -169,7 +204,7 @@ export default function Clients() {
         </div>
       </div>
 
-      {/* toasts */}
+      {/* Toast notifications */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map((t) => (
           <div
