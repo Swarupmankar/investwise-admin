@@ -7,7 +7,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { MessageModal } from "@/components/clients/MessageModal";
 import { KYCDocumentItem } from "@/components/clients/KYCDocumentItem";
 import type { KycDocType, KycReviewAction } from "@/types/users/kyc.types";
 import {
@@ -561,21 +560,6 @@ export function KYCTab({ client }: KYCTabProps) {
           </div>
         </div>
       )}
-
-      <MessageModal
-        open={messageOpen}
-        onOpenChange={setMessageOpen}
-        clientName={
-          (client as any).name ??
-          `${(client as any).firstName ?? ""} ${
-            (client as any).lastName ?? ""
-          }`.trim()
-        }
-        clientId={(client as any).id ?? (client as any).userId}
-        messages={[]}
-        initialTitle={initialTitle}
-        initialMessage={initialMessage}
-      />
     </div>
   );
 }

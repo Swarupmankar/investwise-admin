@@ -9,6 +9,7 @@ import {
   Phone,
   Calendar,
   Activity,
+  Gift,
 } from "lucide-react";
 import type { UserDetailApi } from "@/types/users/userDetail.types";
 
@@ -80,12 +81,10 @@ export const ClientDashboardHeader = ({
                 <Calendar className="h-3 w-3" />
                 Joined {formatDate(client.createdAt)}
               </div>
-              {client.updatedAt && (
-                <div className="flex items-center gap-1">
-                  <Activity className="h-3 w-3" />
-                  Last active {formatDate(client.updatedAt)}
-                </div>
-              )}
+              <div className="flex items-center gap-1">
+                <Gift className="h-3 w-3" />
+                Referral Code : {client.Referral?.code}
+              </div>
             </div>
 
             <div className="flex items-center gap-2">

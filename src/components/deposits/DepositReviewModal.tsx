@@ -209,7 +209,7 @@ export function DepositReviewModal({
 
                 <div>
                   <Label className="text-muted-foreground">
-                    Transaction ID
+                    Wallet Address
                   </Label>
                   <div className="mt-1">
                     {deposit.depositWallet ? (

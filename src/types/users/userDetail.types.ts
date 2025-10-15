@@ -82,6 +82,7 @@ export interface UserNotificationRecipientApi {
 
 export interface ReferralApi {
   earningsBalance: string;
+  code: string;
 }
 
 export interface UserDetailApi {
