@@ -49,6 +49,47 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+/** -------- Address validators (typed to your union) -------- */
+const ADDRESS_VALIDATORS: Record<WalletNetwork, (a: string) => boolean> = {
+  Bitcoin: (a: string) =>
+    /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,62}$/i.test(a.trim()),
+
+  Ethereum: (a: string) => /^0x[a-fA-F0-9]{40}$/.test(a.trim()),
+
+  /** Your union literal is "TRON (TRC20)" — use that, not "Tron" */
+  "TRON (TRC20)": (a: string) => /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(a.trim()),
+
+  /** Treat BSC like Ethereum addresses for basic UI validation */
+  "BNB Smart Chain (BEP20)": (a: string) =>
+    /^0x[a-fA-F0-9]{40}$/.test(a.trim()),
+
+  /** Solana base58 (no 0/O/I/l), typical 32–44 chars */
+  Solana: (a: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(a.trim()),
+
+  /** Litecoin legacy: L/M/3 prefixes, base58 26–33 payload */
+  Litecoin: (a: string) =>
+    /^([LM3])[a-km-zA-HJ-NP-Z1-9]{26,33}$/.test(a.trim()),
+};
+
+/** -------- QR payload builder (use your exact literals) -------- */
+function buildQrPayload(network: WalletNetwork, address: string) {
+  const addr = address.trim();
+  if (!addr) return "";
+  switch (network) {
+    case "Bitcoin":
+      return `bitcoin:${addr}`; // BIP21
+    case "TRON (TRC20)":
+      return `tron:${addr}`; // tron:ADDR
+    // For others, raw address is widely accepted by wallet scanners
+    case "Ethereum":
+    case "BNB Smart Chain (BEP20)":
+    case "Solana":
+    case "Litecoin":
+    default:
+      return addr;
+  }
+}
+
 const SEO = {
   title: "Payment Settings – Admin Wallets",
   description:
@@ -64,7 +105,7 @@ export default function PaymentSettings() {
     createWallet,
     setActiveWallet,
     deleteWallet,
-    qrValueFor,
+    qrValueFor, // kept for compatibility elsewhere
     copyAddress,
     networks,
   } = usePaymentSettings();
@@ -79,11 +120,16 @@ export default function PaymentSettings() {
     [wallets, selectedId]
   );
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    nickname: string;
+    network: WalletNetwork;
+    address: string;
+  }>({
     nickname: "",
     network: (networks?.[0] as WalletNetwork) ?? "Bitcoin",
     address: "",
   });
+
   const [copied, setCopied] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -129,11 +175,36 @@ export default function PaymentSettings() {
     }
   }, [selected, networks]);
 
+  /** --- Live validity + live QR for current view --- */
+  const isAddressValid = useMemo(() => {
+    const validator = ADDRESS_VALIDATORS[form.network];
+    return validator ? validator(form.address) : !!form.address.trim();
+  }, [form.network, form.address]);
+
+  const liveQrValue = useMemo(() => {
+    const network = (
+      selected ? selected.network : form.network
+    ) as WalletNetwork;
+    const address = selected ? selected.address : form.address;
+    return buildQrPayload(network, address);
+  }, [selected, form.network, form.address]);
+
   // CREATE or REPLACE (edit) handler
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!form.nickname.trim() || !form.address.trim()) {
       toast.error("Nickname and address are required");
+      return;
+    }
+
+    const validator = ADDRESS_VALIDATORS[form.network];
+    if (validator && !validator(form.address)) {
+      toast.error(
+        form.network === "TRON (TRC20)"
+          ? "Invalid TRON (TRC20) address. It should start with 'T' and be 34 Base58 characters."
+          : `Invalid ${form.network} address.`
+      );
       return;
     }
 
@@ -381,6 +452,8 @@ export default function PaymentSettings() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Address with inline validity */}
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="address">Address</Label>
                     <div className="flex gap-2">
@@ -390,13 +463,22 @@ export default function PaymentSettings() {
                         onChange={(e) =>
                           setForm((f) => ({ ...f, address: e.target.value }))
                         }
-                        placeholder="Paste wallet address"
+                        placeholder={
+                          form.network === "TRON (TRC20)"
+                            ? "Paste TRON (TRC20) address (T… 34 chars)"
+                            : "Paste wallet address"
+                        }
                       />
                       <Button
                         type="button"
                         variant="outline"
                         onClick={onCopy}
                         disabled={!selected}
+                        title={
+                          selected
+                            ? "Copy selected address"
+                            : "Select a wallet first"
+                        }
                       >
                         {copied ? (
                           <Check className="h-4 w-4" />
@@ -405,14 +487,27 @@ export default function PaymentSettings() {
                         )}
                       </Button>
                     </div>
+
+                    {form.address ? (
+                      <div
+                        className={`text-xs mt-1 ${
+                          isAddressValid
+                            ? "text-emerald-600"
+                            : "text-destructive"
+                        }`}
+                      >
+                        {isAddressValid
+                          ? "Looks good."
+                          : `Invalid ${form.network} address.`}
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* Actions */}
                   <div className="flex gap-2 md:col-span-2">
-                    <Button // make it a real submit only when not editing
+                    <Button
                       type={isEditing ? "button" : "submit"}
                       className="min-w-28"
-                      // disabled while processing; also disabled when editing to block Replace
                       disabled={isProcessing || isEditing}
                       aria-disabled={isProcessing || isEditing}
                       title={
@@ -459,7 +554,7 @@ export default function PaymentSettings() {
                       Live QR
                     </div>
                     <div className="rounded-lg border bg-card p-4 flex items-center justify-center">
-                      <QRCode value={qrValueFor(selected ?? null)} size={164} />
+                      <QRCode value={liveQrValue || " "} size={164} />
                     </div>
                   </div>
                   <div>

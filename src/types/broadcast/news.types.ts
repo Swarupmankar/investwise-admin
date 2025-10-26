@@ -12,6 +12,7 @@ export interface NewsPost {
   title: string;
   summary: string;
   fileUrl?: string;
+  banner?: string;
 }
 
 export interface AttachedFile {
@@ -33,6 +34,7 @@ export interface AllNewsPost {
   emailSent?: boolean;
   createdAt: string;
   publishedAt?: string;
+  banner?: string;
 }
 
 export interface NotificationItem {
@@ -54,6 +56,7 @@ export type CombinedPost = {
   fileUrl?: string | null;
   raw?: NewsPost | NotificationItem;
   createdAt?: string;
+  banner?: string | null;
 };
 
 export type NotificationsResponse = NotificationItem[];

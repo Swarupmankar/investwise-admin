@@ -47,6 +47,31 @@ const norm = (v?: unknown) =>
 const capitalize = (s?: string) =>
   !s ? "" : String(s).charAt(0).toUpperCase() + String(s).slice(1);
 
+const firstOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+const firstOfNextMonth = (d: Date) =>
+  new Date(d.getFullYear(), d.getMonth() + 1, 1);
+const daysInMonth = (d: Date) =>
+  new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+
+const isSameYearMonth = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+
+/** exclusive of the end date (25th → 1st next = remaining days in month) */
+const diffCalendarDays = (end: Date, start: Date) => {
+  const MS = 24 * 60 * 60 * 1000;
+  const a = new Date(
+    end.getFullYear(),
+    end.getMonth(),
+    end.getDate()
+  ).getTime();
+  const b = new Date(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate()
+  ).getTime();
+  return Math.round((a - b) / MS);
+};
+
 interface InvestmentsTabProps {
   investments: UserInvestmentApi[];
   onChangeStatus?: (investmentId: number | string, status: string) => void;
@@ -137,12 +162,26 @@ export function InvestmentsTab({
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
 
-  // prorated return: use amount and createdAt as start date if available
   const proratedReturn = (i: UserInvestmentApi) => {
-    const monthlyRoi = 0.01; // 1% monthly assumption
-    const days = daysActiveThisMonth(i.createdAt ?? undefined);
-    const daysInMonth = new Date().getDate() || 30;
-    return toNumber(i.amount) * monthlyRoi * (days / daysInMonth);
+    const amount = toNumber(i.amount);
+    if (amount <= 0) return 0;
+
+    const monthlyRoi = 0.05; // 5% monthly
+    const now = new Date();
+    const created = i.createdAt ? new Date(i.createdAt) : now;
+
+    // If investment started in a previous month -> full 5% for the month
+    if (!isSameYearMonth(created, now)) {
+      return amount * monthlyRoi;
+    }
+
+    // Started this month -> pay only remaining days
+    const monthEndNext = firstOfNextMonth(now); // 1st of next month
+    const remainingDays = Math.max(0, diffCalendarDays(monthEndNext, created)); // remaining days in this month
+    const dim = daysInMonth(now);
+    const factor = dim > 0 ? remainingDays / dim : 0;
+
+    return amount * monthlyRoi * factor;
   };
 
   // Toggle pause/resume using the appropriate API (optimistic UI)
@@ -330,7 +369,7 @@ export function InvestmentsTab({
                       </TableCell>
 
                       <TableCell className="text-right whitespace-nowrap">
-                        {formatCurrency(toNumber(i.thisMonthsReturns))}
+                        {formatCurrency(proratedReturn(i))}
                       </TableCell>
 
                       <TableCell className="text-right whitespace-nowrap">
@@ -387,7 +426,10 @@ export function InvestmentsTab({
       </Card>
 
       <InvestmentDetailModal
-        open={openId !== null}
+        open={
+          openId !== null &&
+          !!investments.find((inv) => Number(inv.id) === openId)
+        }
         onOpenChange={(v) => {
           if (!v) setOpenId(null);
         }}
