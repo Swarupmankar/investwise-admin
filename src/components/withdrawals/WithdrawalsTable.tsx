@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { WithdrawalStatusBadge } from "./WithdrawalStatusBadge";
 import { WalletAddressCopy } from "./WalletAddressCopy";
-import type { Withdrawal } from "@/types/transactions/withdraw";
+import type { Withdrawal } from "@/types/transactions/withdraw.types";
 
 interface WithdrawalsTableProps {
   withdrawals: Withdrawal[];
@@ -74,7 +74,7 @@ export function WithdrawalsTable({
             // map label for button depending on status (normalized)
             const actionLabel =
               statusNorm === "approved"
-                ? "Waiting for Proof"
+                ? "View Details"
                 : statusNorm === "proof_submitted" ||
                   statusNorm === "proof-submitted"
                 ? "Review Proof"

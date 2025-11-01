@@ -1,7 +1,7 @@
 // src/API/withdrawals.api.ts
 import { ENDPOINTS } from "@/constants/apiEndpoints";
 import { baseApi } from "./baseApi";
-import type { WithdrawApi } from "@/types/transactions/withdraw";
+import type { WithdrawApi } from "@/types/transactions/withdraw.types";
 
 export const withdrawalsApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
@@ -28,33 +28,54 @@ export const withdrawalsApi = baseApi.injectEndpoints({
           : [{ type: "Withdrawals", id: "LIST" }],
     }),
 
-    // Patch update endpoint — body: { transactionId: number, status: "APPROVED"|"REJECTED"|"REVIEW"|... }
     updateWithdrawalStatus: build.mutation<
       any,
       { transactionId: number; status: string }
     >({
       query: ({ transactionId, status }) => ({
-        url: ENDPOINTS.WITHDRAWALS.UPLOAD_WITHDRAWAL_PROOF,
+        url: ENDPOINTS.WITHDRAWALS.UPDATE_WITHDRAWAL_STATUS,
         method: "PATCH",
-        body: { transactionId, status },
+        data: { transactionId, status }, // axios payload
       }),
       invalidatesTags: [{ type: "Withdrawals", id: "LIST" }],
     }),
 
-    // New: upload withdraw proof endpoint (form-data)
+    // ✅ transactionId is strictly number here
     uploadWithdrawProof: build.mutation<
       any,
-      { transactionId: number; file: File }
+      { transactionId: number; file: File; txId?: string }
     >({
-      query: ({ transactionId, file }) => {
+      query: ({ transactionId, file, txId }) => {
         const form = new FormData();
-        form.append("transactionId", String(transactionId));
+        form.append("transactionId", String(transactionId)); // backend reads it from multipart
+        if (txId) form.append("txId", txId.trim());
         form.append("file", file);
+
+        // 🔎 DEBUG: log exactly what we send
+        if (import.meta?.env?.DEV) {
+          const entries: any[] = [];
+          form.forEach((v, k) => {
+            entries.push([
+              k,
+              v instanceof File
+                ? { kind: "File", name: v.name, size: v.size, type: v.type }
+                : v,
+            ]);
+          });
+          // eslint-disable-next-line no-console
+          console.log("[uploadWithdrawProof] payload", {
+            transactionId,
+            typeofTransactionId: typeof transactionId,
+            txId,
+            file: { name: file.name, size: file.size, type: file.type },
+            formEntries: entries,
+          });
+        }
+
         return {
           url: ENDPOINTS.WITHDRAWALS.UPLOAD_WITHDRAWAL_PROOF,
           method: "PATCH",
           data: form,
-          headers: {},
         };
       },
       invalidatesTags: [{ type: "Withdrawals", id: "LIST" }],

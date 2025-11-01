@@ -1,30 +1,17 @@
-// src/pages/Withdrawals.tsx
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/formatters";
-import type {
-  Withdrawal as WithdrawalType,
-  // If you have a UI filter type, import it; otherwise we'll keep a local shape below
-} from "@/types/transactions/withdraw";
+import type { Withdrawal as WithdrawalType } from "@/types/transactions/withdraw.types";
 import { useWithdrawalsData } from "@/hooks/useWithdrawalsData";
 import { WithdrawalFilters } from "@/components/withdrawals/WithdrawalFilters";
 import { WithdrawalsTable } from "@/components/withdrawals/WithdrawalsTable";
 import { WithdrawalReviewModal } from "@/components/withdrawals/WithdrawalReviewModal";
-
-/**
- * Local filter shape used by the UI controls.
- * The hook expects getFiltered(filters: { query?, status?, startDate?, endDate? }, type?)
- * so we'll map from this UI shape to the hook shape when calling getFiltered.
- */
-type UIFilters = {
-  search?: string;
-  status?: string; // "all" | "pending" | "approved" | "rejected" | ...
-  dateRange?: { from?: string | undefined; to?: string | undefined };
-};
+import type { WithdrawalFilters as UIFilters } from "@/types/withdrawal"; // ✅ use the same type the component expects
 
 export default function Withdrawals() {
+  // ✅ state now uses WithdrawalFilters with Date objects
   const [filters, setFilters] = useState<UIFilters>({
     search: "",
     status: "all",
@@ -38,21 +25,15 @@ export default function Withdrawals() {
     "return" | "referral" | "principal"
   >("return");
 
-  const {
-    // note: hook provides getFiltered, getStats, updateWithdrawalStatus, markAsReviewed
-    getFiltered,
-    getStats,
-    updateWithdrawalStatus,
-    markAsReviewed,
-  } = useWithdrawalsData();
+  const { getFiltered, getStats, updateWithdrawalStatus } =
+    useWithdrawalsData();
 
-  // map UI filter -> hook filter shape
+  // ✅ map Date -> string only when calling the hook
   const mapFiltersForHook = (f: UIFilters) => ({
     query: f.search,
     status: f.status,
-    // convert dateRange to startDate/endDate string if present
-    startDate: f.dateRange?.from,
-    endDate: f.dateRange?.to,
+    startDate: f.dateRange?.from ? f.dateRange.from.toISOString() : undefined,
+    endDate: f.dateRange?.to ? f.dateRange.to.toISOString() : undefined,
   });
 
   const hookFilters = mapFiltersForHook(filters);
@@ -79,18 +60,15 @@ export default function Withdrawals() {
     emailSent?: boolean
   ) => {
     try {
-      await updateWithdrawalStatus(id, "APPROVED"); // send backend token
-      // optionally pass extra fields if your hook supports them (e.g. adminMessage, tx link)
-      // mark as reviewed/completed if your business logic requires it:
-      // await markAsReviewed(id, adminMessage);
+      // no status change here
       setModalOpen(false);
       setSelectedWithdrawal(null);
     } catch (err) {
-      console.error("Approve failed", err);
-      // You likely have a toast hook; show error to user here if available
+      console.error("Approve (no-op) failed", err);
     }
   };
 
+  // Reject: send REJECTED (unchanged)
   const handleReject = async (
     id: number | string,
     adminMessage?: string,
@@ -105,19 +83,10 @@ export default function Withdrawals() {
     }
   };
 
-  const handleMarkReviewed = async (
-    id: number | string,
-    completionMessage?: string
-  ) => {
+  // Mark as Completed: send APPROVED (this updates status)
+  const handleMarkReviewed = async (id: number | string) => {
     try {
-      // depending on API: you may use updateWithdrawalStatus(id, "REVIEW") or call a separate markReviewed helper.
-      await updateWithdrawalStatus(id, "REVIEW");
-      // Optionally call local markAsReviewed if the hook provides it to update UI faster
-      try {
-        markAsReviewed?.(id, completionMessage);
-      } catch {
-        /* ignore */
-      }
+      await updateWithdrawalStatus(id, "APPROVED");
       setModalOpen(false);
       setSelectedWithdrawal(null);
     } catch (err) {
@@ -206,7 +175,7 @@ export default function Withdrawals() {
             <CardTitle>Filters</CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Your WithdrawalFilters component expects a shape; keep passing UI filters */}
+            {/* ✅ props now match exactly */}
             <WithdrawalFilters filters={filters} onFiltersChange={setFilters} />
           </CardContent>
         </Card>

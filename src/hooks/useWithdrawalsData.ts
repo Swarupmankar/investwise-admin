@@ -1,4 +1,3 @@
-// src/hooks/useWithdrawalsData.ts
 import { useCallback, useMemo } from "react";
 import {
   useGetAllWithdrawalsQuery,
@@ -12,6 +11,17 @@ import type {
   WithdrawFromType,
   CanonicalWithdrawStatus,
 } from "@/types/transactions/withdraw.types";
+
+const API_BASE =
+  (import.meta as any)?.env?.VITE_API_BASE_URL ||
+  `${window.location.protocol}//${window.location.hostname}:3000`;
+
+const normalizeUrl = (u?: string | null) => {
+  if (!u) return null;
+  if (/^https?:\/\//i.test(u)) return u;
+  const path = String(u).replace(/^\/?/, "/");
+  return `${API_BASE}${path}`;
+};
 
 /** safe parse to number */
 const toNumber = (v?: string | number | null) => {
@@ -89,6 +99,11 @@ export function useWithdrawalsData() {
         name: `User ${w.userId}`,
         email: "",
       };
+
+      // normalize image URLs so <img src=...> can load them
+      const userProof = normalizeUrl(w.userProofUrl ?? null);
+      const adminProof = normalizeUrl(w.adminProofUrl ?? null);
+
       return {
         id: w.id,
         userId: w.userId,
@@ -99,15 +114,21 @@ export function useWithdrawalsData() {
         amount: toNumber(w.amount),
         walletAddress: w.userWallet ?? "",
         txid: w.txId ?? null,
-        screenshot: w.userProofUrl ?? w.adminProofUrl ?? null,
+
+        // prefer the user's uploaded proof, then admin
+        screenshot: userProof ?? adminProof ?? null,
+
         statusRaw: w.status,
         status: canonicalStatus(w.status),
         withdrawFromRaw: w.withdrawFrom,
         withdrawFrom: mapWithdrawFrom(w.withdrawFrom),
         createdAt: w.createdAt,
         updatedAt: w.updatedAt ?? null,
-        adminProofUrl: w.adminProofUrl ?? null,
-        userProofUrl: w.userProofUrl ?? null,
+
+        // expose the normalized URLs too
+        adminProofUrl: adminProof,
+        userProofUrl: userProof,
+
         reviewedAt: (w as any).reviewedAt ?? null,
         reviewedBy: (w as any).reviewedBy ?? null,
         completedAt: (w as any).completedAt ?? null,
@@ -117,7 +138,7 @@ export function useWithdrawalsData() {
     });
   }, [raw, usersMap]);
 
-  // stats
+  // stats (unchanged) …
   const getStats = useCallback(
     (type?: WithdrawFromType) => {
       const list = type
@@ -189,20 +210,29 @@ export function useWithdrawalsData() {
     [updateWithdrawalStatusMutation, refetchWithdrawals]
   );
 
-  // new: upload proof (FormData). Returns the server response.
+  // upload proof (FormData). Returns the server response.
   const uploadWithdrawProof = useCallback(
-    async (transactionId: number | string, file: File) => {
-      const numericId =
-        typeof transactionId === "number"
-          ? transactionId
-          : Number(transactionId);
+    async (transactionId: number, file: File, txId?: string) => {
       if (!file) throw new Error("No file supplied");
+
+      // 🔎 DEBUG before calling RTK
+      // eslint-disable-next-line no-console
+      console.log("[hook] uploadWithdrawProof args", {
+        transactionId,
+        typeofTransactionId: typeof transactionId,
+        txId,
+        file: file
+          ? { name: file.name, size: file.size, type: file.type }
+          : null,
+      });
+
       try {
         const res = await uploadWithdrawProofMutation({
-          transactionId: numericId,
+          transactionId, // ✅ strictly number
           file,
+          txId,
         }).unwrap();
-        // refresh list
+
         await refetchWithdrawals();
         return res;
       } catch (err) {

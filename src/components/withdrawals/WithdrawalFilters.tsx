@@ -1,8 +1,18 @@
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { CalendarIcon, X } from "lucide-react";
 import { format } from "date-fns";
 import { type WithdrawalFilters } from "@/types/withdrawal";
@@ -12,7 +22,10 @@ interface WithdrawalFiltersProps {
   onFiltersChange: (filters: WithdrawalFilters) => void;
 }
 
-export function WithdrawalFilters({ filters, onFiltersChange }: WithdrawalFiltersProps) {
+export function WithdrawalFilters({
+  filters,
+  onFiltersChange,
+}: WithdrawalFiltersProps) {
   const handleSearchChange = (value: string) => {
     onFiltersChange({ ...filters, search: value });
   };
@@ -22,16 +35,16 @@ export function WithdrawalFilters({ filters, onFiltersChange }: WithdrawalFilter
   };
 
   const handleDateFromChange = (date: Date | undefined) => {
-    onFiltersChange({ 
-      ...filters, 
-      dateRange: { ...filters.dateRange, from: date } 
+    onFiltersChange({
+      ...filters,
+      dateRange: { ...filters.dateRange, from: date },
     });
   };
 
   const handleDateToChange = (date: Date | undefined) => {
-    onFiltersChange({ 
-      ...filters, 
-      dateRange: { ...filters.dateRange, to: date } 
+    onFiltersChange({
+      ...filters,
+      dateRange: { ...filters.dateRange, to: date },
     });
   };
 
@@ -39,11 +52,15 @@ export function WithdrawalFilters({ filters, onFiltersChange }: WithdrawalFilter
     onFiltersChange({
       search: "",
       status: "all",
-      dateRange: { from: undefined, to: undefined }
+      dateRange: { from: undefined, to: undefined },
     });
   };
 
-  const hasActiveFilters = filters.search || filters.status !== "all" || filters.dateRange.from || filters.dateRange.to;
+  const hasActiveFilters =
+    filters.search ||
+    filters.status !== "all" ||
+    filters.dateRange.from ||
+    filters.dateRange.to;
 
   return (
     <div className="space-y-4">
@@ -56,7 +73,7 @@ export function WithdrawalFilters({ filters, onFiltersChange }: WithdrawalFilter
             className="max-w-sm"
           />
         </div>
-        
+
         <Select value={filters.status} onValueChange={handleStatusChange}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Filter by status" />
@@ -64,10 +81,12 @@ export function WithdrawalFilters({ filters, onFiltersChange }: WithdrawalFilter
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="admin_proof_uploaded">
+              Proof Submitted
+            </SelectItem>
+            <SelectItem value="review">Under Review</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
-            <SelectItem value="proof_submitted">Proof Submitted</SelectItem>
-            <SelectItem value="reviewed">Completed</SelectItem>
           </SelectContent>
         </Select>
 
@@ -122,7 +141,11 @@ export function WithdrawalFilters({ filters, onFiltersChange }: WithdrawalFilter
         </div>
 
         {hasActiveFilters && (
-          <Button variant="outline" onClick={clearFilters} className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={clearFilters}
+            className="flex items-center gap-2"
+          >
             <X className="h-4 w-4" />
             Clear
           </Button>

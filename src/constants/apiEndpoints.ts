@@ -48,6 +48,7 @@ export const ENDPOINTS = {
   WITHDRAWALS: {
     ALL_WITHDRAWALS: "/admin/transactions/all-users-withdrawals",
     UPLOAD_WITHDRAWAL_PROOF: "/admin/transactions/upload-withdraw-proof",
+    UPDATE_WITHDRAWAL_STATUS: "/admin/transactions/update-withdraw-transaction",
   },
 
   GATEWAY: {
