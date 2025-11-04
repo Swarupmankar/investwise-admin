@@ -1,4 +1,3 @@
-// src/pages/index.tsx
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { DashboardCard } from "@/components/dashboard/DashboardCard";
 import { BalanceEntryForm } from "@/components/dashboard/BalanceEntryForm";
@@ -15,20 +14,23 @@ import {
   ArrowUpCircle,
 } from "lucide-react";
 
+// simplified type - only known fields
+type BalanceEntry = {
+  amount?: number;
+  delta?: number;
+  createdAt?: Date;
+};
+
 const Index = () => {
   const {
     stats,
     balances,
-    isLoading,
-    isFetching,
     creating,
     createCurrentBalance,
     refetchStats,
     refetchBalances,
-    error,
   } = useFinancialData();
 
-  // safe numeric fallbacks (stats properties are already parsed numbers in the hook)
   const principal = stats?.principalBalance ?? 0;
   const principalWithdrawn = stats?.principalWithdrawn ?? 0;
   const totalPrincipalWithdrawn = stats?.totalPrincipalWithdrawn ?? 0;
@@ -36,61 +38,75 @@ const Index = () => {
   const clientsCount = stats?.clientsCount ?? 0;
   const investmentsCount = stats?.investmentsCount ?? 0;
 
-  // monthly fields (already parsed or 0)
-  const monthlyRoi = stats?.thisMonthRoi ?? undefined;
-  const monthlyReferral = stats?.thisMonthRefEarnings ?? undefined;
+  const monthlyRoi = stats?.thisMonthRoi ?? 0;
+  const monthlyReferral = stats?.thisMonthRefEarnings ?? 0;
   const monthlyPrincipalWithdrawn = stats?.thisMonthPrincipalWithdrawn ?? 0;
 
-  const monthlyOutflowRoi =
-    monthlyRoi !== undefined ? monthlyRoi : principal * 0.05;
-  const monthlyOutflowReferral =
-    monthlyReferral !== undefined ? monthlyReferral : principal * 0.01;
-  const monthlyOutflowPrincipal = monthlyPrincipalWithdrawn ?? 0;
+  const withinSameMonth = (d: Date, reference: Date) =>
+    d.getUTCFullYear() === reference.getUTCFullYear() &&
+    d.getUTCMonth() === reference.getUTCMonth();
 
+  const getDeltaFromTableMTD = (rows: BalanceEntry[] = []): number => {
+    if (!rows.length) return 0;
+    const today = new Date();
+
+    const monthRows = rows.filter((r) =>
+      r.createdAt ? withinSameMonth(r.createdAt, today) : true
+    );
+
+    const hasExplicitDelta = monthRows.some((r) => typeof r.delta === "number");
+    if (hasExplicitDelta) {
+      return monthRows.reduce((sum, r) => sum + (r.delta ?? 0), 0);
+    }
+
+    const sorted = monthRows.sort(
+      (a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0)
+    );
+
+    const firstAmt = sorted[0]?.amount ?? 0;
+    const lastAmt = sorted[sorted.length - 1]?.amount ?? firstAmt;
+
+    return lastAmt - firstAmt;
+  };
+
+  const monthlyOutflowRoi = monthlyRoi;
+  const monthlyOutflowReferral = monthlyReferral;
+  const monthlyOutflowPrincipal = monthlyPrincipalWithdrawn;
   const monthlyOutflowTotal =
-    (monthlyOutflowRoi ?? 0) +
-    (monthlyOutflowReferral ?? 0) +
-    (monthlyOutflowPrincipal ?? 0);
+    Number(stats?.thisMonthRoi ?? 0) +
+    Number(stats?.thisMonthRefEarnings ?? 0) +
+    Number(stats?.thisMonthPrincipalWithdrawn ?? 0);
 
-  const totalWithdrawn = totalProfitWithdrawn + totalPrincipalWithdrawn;
-  const currentPnL = principal - (totalWithdrawn + monthlyOutflowTotal);
+  const totalWithdrawn =
+    Number(stats?.totalProfitWithdrawn ?? 0) +
+    Number(stats?.totalPrincipalWithdrawn ?? 0);
 
-  const getPnLColor = () => {
-    if (currentPnL > 0) return "success";
-    if (currentPnL < 0) return "destructive";
-    return "default";
-  };
+  const currentRow = balances.find((b) => b.isCurrent === true);
 
-  const getPnLText = () => {
-    if (currentPnL > 0) return "Surplus";
-    if (currentPnL < 0) return "Deficit";
-    return "Break Even";
-  };
+  const delta = currentRow
+    ? Number(currentRow.amount ?? 0) - Number(stats?.principalBalance ?? 0)
+    : Number(stats?.principalBalance ?? 0);
+
+  const afterOutflow = delta - monthlyOutflowTotal;
+  const currentPnL = afterOutflow - Number(stats?.principalWithdrawn ?? 0);
+
+  const getPnLColor = () =>
+    currentPnL > 0 ? "success" : currentPnL < 0 ? "destructive" : "default";
+
+  const getPnLText = () =>
+    currentPnL > 0 ? "Surplus" : currentPnL < 0 ? "Deficit" : "Break Even";
 
   const handleBalanceSubmit = async (amount: number, notes?: string) => {
-    // call hook action which wraps the mutation
     try {
       const res = await createCurrentBalance({ amount, notes });
       if (res?.success) {
-        try {
-          refetchBalances();
-          refetchStats();
-        } catch {
-          /* ignore */
-        }
+        refetchBalances();
+        refetchStats();
       } else {
-        const err = res?.error ?? res;
-        toast.error(
-          err?.data?.message ??
-            err?.message ??
-            "Failed to create current balance"
-        );
+        toast.error("Failed to create current balance");
       }
     } catch (err: any) {
-      console.error("create current balance error", err);
-      toast.error(
-        err?.data?.message ?? err?.message ?? "Failed to create current balance"
-      );
+      toast.error(err?.message ?? "Failed to create current balance");
     }
   };
 

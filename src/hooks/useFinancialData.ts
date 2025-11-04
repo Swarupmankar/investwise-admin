@@ -1,4 +1,3 @@
-// src/hooks/useFinancialData.ts
 import { useCallback, useMemo } from "react";
 import {
   useGetDashboardStatsQuery,
@@ -13,7 +12,6 @@ import {
 } from "@/types/dashboard/stats.types";
 
 export function useFinancialData() {
-  // queries
   const {
     data: statsRaw,
     error: statsError,
@@ -30,14 +28,11 @@ export function useFinancialData() {
     refetch: refetchBalances,
   } = useGetCurrentBalancesQuery();
 
-  // mutation for creating current balance
   const [createMutation, { isLoading: creating }] =
     useCreateCurrentBalanceMutation();
 
-  // parse helper
   const parseNum = (v: any, fallback = 0) => {
-    if (v === undefined || v === null) return fallback;
-    const n = typeof v === "string" ? Number(v) : Number(v);
+    const n = Number(v);
     return Number.isFinite(n) ? n : fallback;
   };
 
@@ -45,31 +40,17 @@ export function useFinancialData() {
   const stats = useMemo(() => {
     if (!statsRaw) return null;
 
-    const parse = (s?: string) => {
-      if (s === undefined || s === null) return 0;
-      const n = Number(s);
-      return Number.isFinite(n) ? n : 0;
-    };
-
-    const principalBalance = parse(statsRaw.principalBalance);
-    const principalWithdrawn = parse(statsRaw.principalWithdrawn);
-    const thisMonthRoi = parse(statsRaw.thisMonthRoi);
-    const thisMonthRefEarnings = parse(statsRaw.thisMonthRefEarnings);
-    const thisMonthPrincipalWithdrawn = parse(
-      statsRaw.thisMonthPrincipalWithdrawn
-    );
-    const totalProfitWithdrawn = parse(statsRaw.totalProfitWithdrawn);
-    const totalPrincipalWithdrawn = parse(statsRaw.totalPrincipalWithdrawn);
-
     return {
       raw: statsRaw as DashboardStatsRaw,
-      principalBalance,
-      principalWithdrawn,
-      thisMonthRoi,
-      thisMonthRefEarnings,
-      thisMonthPrincipalWithdrawn,
-      totalProfitWithdrawn,
-      totalPrincipalWithdrawn,
+      principalBalance: parseNum(statsRaw.principalBalance),
+      principalWithdrawn: parseNum(statsRaw.principalWithdrawn),
+      thisMonthRoi: parseNum(statsRaw.thisMonthRoi),
+      thisMonthRefEarnings: parseNum(statsRaw.thisMonthRefEarnings),
+      thisMonthPrincipalWithdrawn: parseNum(
+        statsRaw.thisMonthPrincipalWithdrawn
+      ),
+      totalProfitWithdrawn: parseNum(statsRaw.totalProfitWithdrawn),
+      totalPrincipalWithdrawn: parseNum(statsRaw.totalPrincipalWithdrawn),
       clientsCount: statsRaw.clientsCount,
       investmentsCount: statsRaw.investmentsCount,
     };
@@ -80,40 +61,33 @@ export function useFinancialData() {
     if (!balancesRaw || !Array.isArray(balancesRaw))
       return [] as CurrentBalance[];
 
-    const parseEntry = (r: CurrentBalanceRaw): CurrentBalance => ({
-      id: r.id,
-      amount: parseNum(r.amount, 0),
-      delta: parseNum(r.delta, 0),
-      notes: r.notes ?? null,
-      isCurrent: Boolean(r.isCurrent),
-      createdAt: new Date(r.createdAt),
-      updatedAt: new Date(r.updatedAt),
-    });
-
-    // sort descending by createdAt (newest first)
-    const parsed = balancesRaw
-      .map(parseEntry)
+    return balancesRaw
+      .map(
+        (r: CurrentBalanceRaw): CurrentBalance => ({
+          id: r.id,
+          amount: parseNum(r.amount),
+          delta: parseNum(r.delta),
+          notes: r.notes ?? null,
+          isCurrent: Boolean(r.isCurrent),
+          createdAt: new Date(r.createdAt),
+          updatedAt: new Date(r.updatedAt),
+        })
+      )
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    return parsed;
   }, [balancesRaw]);
 
-  // Combined loading / error flags
   const isLoading = statsLoading || balancesLoading;
   const isFetching = statsFetching || balancesFetching;
   const error = statsError ?? balancesError ?? null;
 
-  // create current balance wrapper
   const createCurrentBalance = useCallback(
     async (payload: CreateCurrentBalancePayload) => {
       try {
         const res = await createMutation(payload).unwrap();
-        // refetch both queries to update UI
         try {
           refetchBalances();
           refetchStats();
-        } catch {
-          /* ignore refetch errors */
-        }
+        } catch {}
         return { success: true, data: res };
       } catch (err: any) {
         return { success: false, error: err };
@@ -122,28 +96,15 @@ export function useFinancialData() {
     [createMutation, refetchBalances, refetchStats]
   );
 
-  // expose everything useful
   return {
-    // parsed data
-    stats, // null if not loaded yet
-    balances, // normalized array
-
-    // raw data if needed
-    raw: {
-      stats: statsRaw ?? null,
-      balances: balancesRaw ?? null,
-    },
-
-    // flags
+    stats,
+    balances,
+    raw: { stats: statsRaw ?? null, balances: balancesRaw ?? null },
     isLoading,
     isFetching,
     creating,
-    error: error,
-
-    // actions
+    error,
     createCurrentBalance,
-
-    // refetch helpers
     refetchStats,
     refetchBalances,
   } as const;

@@ -1,5 +1,4 @@
-// src/components/news/NewsForm.tsx
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -12,43 +11,55 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Upload, X, FileText, File, Image as ImageIcon } from "lucide-react";
-import { AttachedFile, NewsPost } from "@/types/broadcast/news.types";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateNewsMutation } from "@/API/broadcast.api";
 
+type LocalAttached = {
+  id: string;
+  file: File;
+  name: string;
+  url: string; // object URL for preview
+  type: string;
+  size: number;
+};
+
 interface NewsFormProps {
-  onPublish?: (post: Omit<NewsPost, "id" | "publishedAt">) => void;
+  onPublish?: (post: { title: string; summary: string }) => void;
 }
+
+const MAX_FILES = 10;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_BANNER_SIZE = 5 * 1024 * 1024; // 5MB
 
 export function NewsForm({ onPublish }: NewsFormProps) {
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
 
-  // Banner image (single)
+  // Banner (single)
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreviewUrl, setBannerPreviewUrl] = useState<string>("");
 
-  // Attachment (the actual report/file)
-  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
-  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  // Attachments (multiple)
+  const [attachedFiles, setAttachedFiles] = useState<LocalAttached[]>([]);
 
   const [isPublishing, setIsPublishing] = useState(false);
   const { toast } = useToast();
   const [createNews, { isLoading: isCreating }] = useCreateNewsMutation();
 
-  const allowedAttachmentTypes = [
-    "application/pdf",
-    "image/jpeg",
-    "image/png",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ];
-
-  const allowedBannerTypes = [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/avif",
-  ];
+  const allowedAttachmentTypes = useMemo(
+    () =>
+      new Set([
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ]),
+    []
+  );
+  const allowedBannerTypes = useMemo(
+    () => new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]),
+    []
+  );
 
   const formatFileSize = (bytes: number) => {
     const sizes = ["Bytes", "KB", "MB", "GB"];
@@ -62,16 +73,16 @@ export function NewsForm({ onPublish }: NewsFormProps) {
     if (!files || files.length === 0) return;
 
     const f = files[0];
-    if (!allowedBannerTypes.includes(f.type)) {
+    if (!allowedBannerTypes.has(f.type)) {
       toast({
         title: "Invalid banner type",
-        description: "Banner must be a JPG, PNG, WEBP or AVIF image.",
+        description: "Banner must be JPG, PNG, WEBP or AVIF.",
         variant: "destructive",
       });
       e.currentTarget.value = "";
       return;
     }
-    if (f.size > 5 * 1024 * 1024) {
+    if (f.size > MAX_BANNER_SIZE) {
       toast({
         title: "Banner too large",
         description: "Banner image must be under 5MB.",
@@ -81,9 +92,9 @@ export function NewsForm({ onPublish }: NewsFormProps) {
       return;
     }
 
+    if (bannerPreviewUrl) URL.revokeObjectURL(bannerPreviewUrl);
     setBannerFile(f);
-    const url = URL.createObjectURL(f);
-    setBannerPreviewUrl(url);
+    setBannerPreviewUrl(URL.createObjectURL(f));
     e.currentTarget.value = "";
   };
 
@@ -97,11 +108,22 @@ export function NewsForm({ onPublish }: NewsFormProps) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const fileList = Array.from(files);
-    const newAttached: AttachedFile[] = [];
+    const remainingSlots = MAX_FILES - attachedFiles.length;
+    if (remainingSlots <= 0) {
+      toast({
+        title: "Attachment limit reached",
+        description: `You can attach up to ${MAX_FILES} files.`,
+        variant: "destructive",
+      });
+      e.currentTarget.value = "";
+      return;
+    }
+
+    const fileList = Array.from(files).slice(0, remainingSlots);
+    const accepted: LocalAttached[] = [];
 
     for (const f of fileList) {
-      if (!allowedAttachmentTypes.includes(f.type)) {
+      if (!allowedAttachmentTypes.has(f.type)) {
         toast({
           title: "Invalid file type",
           description: `${f.name} is not supported.`,
@@ -109,42 +131,46 @@ export function NewsForm({ onPublish }: NewsFormProps) {
         });
         continue;
       }
-
-      if (f.size > 10 * 1024 * 1024) {
+      if (f.size > MAX_FILE_SIZE) {
         toast({
           title: "File too large",
-          description: `${f.name} is larger than 10MB.`,
+          description: `${f.name} exceeds 10MB.`,
           variant: "destructive",
         });
         continue;
       }
 
-      const attached: AttachedFile = {
-        id: Math.random().toString(36).substr(2, 9),
+      // simple de-dup by name+size
+      const dup = attachedFiles.some(
+        (af) => af.name === f.name && af.size === f.size
+      );
+      if (dup) continue;
+
+      accepted.push({
+        id: Math.random().toString(36).slice(2, 10),
+        file: f,
         name: f.name,
         url: URL.createObjectURL(f),
         type: f.type,
         size: f.size,
-      };
-
-      newAttached.push(attached);
+      });
     }
 
-    if (newAttached.length > 0) {
-      setAttachedFiles((prev) => [...prev, ...newAttached]);
-      // For backend (single file field expected), keep first file
-      setFileToUpload(fileList[0]);
+    if (accepted.length === 0) {
+      e.currentTarget.value = "";
+      return;
     }
 
+    setAttachedFiles((prev) => [...prev, ...accepted]);
     e.currentTarget.value = "";
   };
 
   const removeAttachedFile = (id: string) => {
-    setAttachedFiles((prev) => prev.filter((f) => f.id !== id));
-    // If we removed the only file that was also the one to upload, clear it
-    if (attachedFiles.length === 1) {
-      setFileToUpload(null);
-    }
+    setAttachedFiles((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target) URL.revokeObjectURL(target.url);
+      return prev.filter((f) => f.id !== id);
+    });
   };
 
   const handlePublish = async () => {
@@ -156,54 +182,44 @@ export function NewsForm({ onPublish }: NewsFormProps) {
       });
       return;
     }
-    if (!fileToUpload) {
+    if (attachedFiles.length === 0) {
       toast({
-        title: "File required",
-        description: "Please attach a report file (PDF/IMG/DOCX).",
+        title: "Files required",
+        description: "Please attach at least one report file.",
         variant: "destructive",
       });
       return;
     }
 
     setIsPublishing(true);
-
     try {
-      // Build payload for API
       const formData = new FormData();
       formData.append("title", title.trim());
       formData.append("summary", summary.trim());
-      formData.append("file", fileToUpload); // report file
 
-      // NEW: banner (backend expects field name "banner" – will store & later return the *name*)
       if (bannerFile) {
-        formData.append("banner", bannerFile);
+        formData.append("banner", bannerFile); // server stores & returns the banner URL/name
       }
 
-      const res = await createNews(formData).unwrap();
+      // IMPORTANT: append each file under the SAME key: "files"
+      attachedFiles.forEach(({ file }) => {
+        formData.append("files", file);
+      });
+
+      await createNews(formData).unwrap();
 
       toast({
         title: "News Published",
         description: "The news report was successfully created.",
       });
 
-      // Optional local callback
-      if (onPublish) {
-        try {
-          onPublish({
-            title: title.trim(),
-            summary: summary.trim(),
-            fileUrl: undefined,
-            banner: undefined, // backend will produce a name later
-          } as any);
-        } catch {}
-      }
+      onPublish?.({ title: title.trim(), summary: summary.trim() });
 
-      // Reset UI
+      // Reset
       setTitle("");
       setSummary("");
       attachedFiles.forEach((f) => URL.revokeObjectURL(f.url));
       setAttachedFiles([]);
-      setFileToUpload(null);
       clearBanner();
     } catch (err) {
       console.error("Failed to publish news:", err);
@@ -224,7 +240,8 @@ export function NewsForm({ onPublish }: NewsFormProps) {
           📝 Publish Report
         </CardTitle>
         <CardDescription>
-          Add a title, summary, banner image, and upload the report file.
+          Add a title, summary, a banner image, and attach up to {MAX_FILES}{" "}
+          files.
         </CardDescription>
       </CardHeader>
 
@@ -257,7 +274,7 @@ export function NewsForm({ onPublish }: NewsFormProps) {
           </p>
         </div>
 
-        {/* Banner Image (NEW) */}
+        {/* Banner Image */}
         <div className="space-y-2">
           <Label>Banner Image</Label>
           <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
@@ -313,9 +330,9 @@ export function NewsForm({ onPublish }: NewsFormProps) {
           )}
         </div>
 
-        {/* Report File (Required) */}
+        {/* Files (multiple) */}
         <div className="space-y-2">
-          <Label>File Attachments </Label>
+          <Label>File Attachments</Label>
           <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
             <div className="text-center">
               <Upload className="mx-auto h-12 w-12 text-muted-foreground/50" />
@@ -334,7 +351,8 @@ export function NewsForm({ onPublish }: NewsFormProps) {
                   />
                 </Label>
                 <p className="text-xs text-muted-foreground mt-1">
-                  PDF, JPG, PNG, DOCX up to 10MB each
+                  PDF, JPG, PNG, DOCX up to 10MB each • {attachedFiles.length}/
+                  {MAX_FILES} attached
                 </p>
               </div>
             </div>
@@ -356,8 +374,10 @@ export function NewsForm({ onPublish }: NewsFormProps) {
                     ) : (
                       <File className="h-4 w-4" />
                     )}
-                    <div>
-                      <p className="text-sm font-medium">{file.name}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate max-w-[280px]">
+                        {file.name}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {formatFileSize(file.size)}
                       </p>

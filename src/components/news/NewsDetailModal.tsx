@@ -12,8 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   FileText,
-  File,
-  Image as ImageIcon,
+  Image,
   Download,
   Edit,
   Trash2,
@@ -304,18 +303,6 @@ export function NewsDetailModal({
                       Notification Type
                     </p>
                     <p>{raw.type ?? "UNKNOWN"}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Recipients
-                    </p>
-                    <p>
-                      {Array.isArray(raw.recipientUserIds) &&
-                      raw.recipientUserIds.length > 0
-                        ? raw.recipientUserIds.join(", ")
-                        : "All / None specified"}
-                    </p>
                   </div>
                 </div>
               </>

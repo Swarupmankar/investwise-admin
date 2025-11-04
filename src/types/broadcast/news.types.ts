@@ -11,7 +11,8 @@ export interface NewsPost {
   id: number;
   title: string;
   summary: string;
-  fileUrl?: string;
+  fileUrls?: string[];
+  fileUrl?: string | null;
   banner?: string;
 }
 
@@ -27,6 +28,7 @@ export interface AllNewsPost {
   id: number;
   title: string;
   summary: string;
+  fileUrls?: string[]; 
   fileUrl?: string | null;
   attachedFiles?: AttachedFile[];
   authorName?: string;
