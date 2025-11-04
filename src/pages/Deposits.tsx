@@ -24,20 +24,15 @@ export default function Deposits() {
     setSelectedDeposit(null);
   };
 
-  const handleApproveDeposit = (
-    id: number | string,
-    message?: string,
-    emailSent?: boolean
-  ) => {
-    return updateDepositStatus(id, "approved", message, emailSent);
+  const handleApproveDeposit = (id: number | string) => {
+    return updateDepositStatus(id, "approved");
   };
 
   const handleRejectDeposit = (
     id: number | string,
-    message?: string,
-    emailSent?: boolean
+    rejectionReason: string
   ) => {
-    return updateDepositStatus(id, "rejected", message, emailSent);
+    return updateDepositStatus(id, "rejected", rejectionReason);
   };
 
   return (

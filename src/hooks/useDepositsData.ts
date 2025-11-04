@@ -1,4 +1,3 @@
-// src/hooks/useDepositsData.ts
 import { useCallback, useMemo, useState } from "react";
 import {
   useGetAllDepositsQuery,
@@ -52,7 +51,7 @@ export function useDepositsData() {
     startDate?: string;
     endDate?: string;
   }>({
-    status: "pending", // default: show pending
+    status: "pending",
     q: undefined,
   });
 
@@ -109,7 +108,6 @@ export function useDepositsData() {
   const filtered = useMemo(() => {
     const q = (filters.q ?? "").toString().toLowerCase().trim();
     return deposits.filter((d) => {
-      // status filter
       if (filters.status && filters.status !== "all") {
         if (
           filters.status === "pending" &&
@@ -128,7 +126,6 @@ export function useDepositsData() {
           return false;
       }
 
-      // simple search (id, txid, clientName, clientEmail, amount)
       if (!q) return true;
       if (String(d.id).includes(q)) return true;
       if ((d.txid ?? "").toLowerCase().includes(q)) return true;
@@ -139,45 +136,38 @@ export function useDepositsData() {
     });
   }, [deposits, filters]);
 
-  // wrapper to call mutation; accept id number|string and friendly status values
+  // wrapper to call mutation
   const updateDepositStatus = useCallback(
-    async (
-      id: number | string,
-      status: string,
-      message?: string,
-      emailSent?: boolean
-    ) => {
+    async (id: number | string, status: string, rejectionReason?: string) => {
       const numericId = typeof id === "number" ? id : Number(id);
-      // map friendly status -> API expected uppercase tokens (narrowed to union)
       const s = (status ?? "").toString().trim().toLowerCase();
       let apiStatus: "APPROVED" | "REJECTED";
 
       if (s === "approved") apiStatus = "APPROVED";
       else if (s === "rejected") apiStatus = "REJECTED";
       else {
-        // invalid status — throw so caller knows
         throw new Error(
           `Invalid status '${status}'. Expected 'approved' or 'rejected'.`
         );
       }
 
-      try {
-        // call mutation with the exact body backend expects
-        console.debug("Calling updateDepositStatusMutation", {
-          transactionId: numericId,
-          status: apiStatus,
-        });
+      // Enforce reason on the client when rejecting (extra safety)
+      if (apiStatus === "REJECTED" && !rejectionReason?.trim()) {
+        throw new Error("Rejection reason is required to reject a deposit.");
+      }
 
+      try {
         await updateDepositStatusMutation({
           transactionId: numericId,
           status: apiStatus,
+          ...(apiStatus === "REJECTED"
+            ? { rejectionReason: rejectionReason?.trim() }
+            : {}),
         }).unwrap();
 
-        // refetch deposits list after success
         await refetchDeposits();
-      } catch (err: any) {
+      } catch (err) {
         console.error("Failed to update deposit status", err);
-        // rethrow so callers (modal) can catch & show toast
         throw err;
       }
     },

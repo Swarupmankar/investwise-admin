@@ -30,13 +30,23 @@ export const withdrawalsApi = baseApi.injectEndpoints({
 
     updateWithdrawalStatus: build.mutation<
       any,
-      { transactionId: number; status: string }
+      { transactionId: number; status: string; rejectionReason?: string }
     >({
-      query: ({ transactionId, status }) => ({
-        url: ENDPOINTS.WITHDRAWALS.UPDATE_WITHDRAWAL_STATUS,
-        method: "PATCH",
-        data: { transactionId, status }, // axios payload
-      }),
+      query: ({ transactionId, status, rejectionReason }) => {
+        const payload: any = { transactionId, status };
+        if (
+          (status ?? "").toString().toUpperCase() === "REJECTED" &&
+          rejectionReason?.trim()
+        ) {
+          payload.rejectionReason = rejectionReason.trim();
+        }
+
+        return {
+          url: ENDPOINTS.WITHDRAWALS.UPDATE_WITHDRAWAL_STATUS,
+          method: "PATCH",
+          data: payload,
+        };
+      },
       invalidatesTags: [{ type: "Withdrawals", id: "LIST" }],
     }),
 

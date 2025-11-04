@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 
 import DepositStatusBadge from "./DepositStatusBadge";
 import { TXIDCopy } from "./TXIDCopy";
@@ -23,16 +22,8 @@ interface DepositReviewModalProps {
   deposit: DepositRequest | null;
   isOpen: boolean;
   onClose: () => void;
-  onApprove: (
-    id: number | string,
-    message?: string,
-    emailSent?: boolean
-  ) => Promise<any>;
-  onReject: (
-    id: number | string,
-    message?: string,
-    emailSent?: boolean
-  ) => Promise<any>;
+  onApprove: (id: number | string) => Promise<any>;
+  onReject: (id: number | string, rejectionReason: string) => Promise<any>;
 }
 
 const canonicalStatus = (raw?: string) => {
@@ -58,33 +49,41 @@ export function DepositReviewModal({
   onApprove,
   onReject,
 }: DepositReviewModalProps) {
-  const [adminMessage, setAdminMessage] = useState("");
-  const [sendEmail, setSendEmail] = useState(true);
+  const [rejectionReason, setRejectionReason] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+  const reasonRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Reset message/sendEmail each time modal opens for a new deposit
+  // Reset reason when modal opens or deposit changes
   useEffect(() => {
     if (isOpen) {
-      setAdminMessage("");
-      setSendEmail(true);
+      setRejectionReason("");
     }
   }, [isOpen, deposit?.id]);
 
   if (!deposit) return null;
 
   const status = canonicalStatus(deposit.status);
-
   const canTakeAction = status === "pending";
 
   const handleAction = async (action: "approve" | "reject") => {
+    // Guard FIRST so approving never asks for a reason
+    if (action === "reject" && !rejectionReason.trim()) {
+      toast({
+        title: "Rejection reason required",
+        description: "Please provide a reason for rejecting this deposit.",
+        variant: "destructive",
+      });
+      reasonRef.current?.focus();
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const idToSend = deposit.id;
 
-      // call the parent handler and await its promise
       if (action === "approve") {
-        await onApprove(idToSend, adminMessage || undefined, sendEmail);
+        await onApprove(idToSend);
         toast({
           title: "Deposit Approved",
           description: `Deposit of ${formatCurrency(
@@ -92,7 +91,7 @@ export function DepositReviewModal({
           )} has been approved.`,
         });
       } else {
-        await onReject(idToSend, adminMessage || undefined, sendEmail);
+        await onReject(idToSend, rejectionReason.trim());
         toast({
           title: "Deposit Rejected",
           description: `Deposit of ${formatCurrency(
@@ -102,11 +101,9 @@ export function DepositReviewModal({
       }
 
       // close and reset
-      setAdminMessage("");
-      setSendEmail(true);
+      setRejectionReason("");
       onClose();
     } catch (err: any) {
-      // log and show detailed error if available
       console.error("Deposit action failed:", err);
       toast({
         title: "Error",
@@ -240,18 +237,6 @@ export function DepositReviewModal({
                     </div>
                   </div>
                 )}
-
-                {("adminMessage" in deposit || (deposit as any).adminMessage) &&
-                  (deposit as any).adminMessage && (
-                    <div>
-                      <Label className="text-muted-foreground">
-                        Admin Message
-                      </Label>
-                      <div className="text-sm bg-muted p-3 rounded-lg mt-1">
-                        {(deposit as any).adminMessage}
-                      </div>
-                    </div>
-                  )}
               </CardContent>
             </Card>
           </div>
@@ -286,29 +271,20 @@ export function DepositReviewModal({
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="adminMessage">
-                      Message to Client (Optional)
+                    <Label htmlFor="rejectionReason">
+                      Rejection reason{" "}
+                      <span className="text-muted-foreground">
+                        (required only when rejecting)
+                      </span>
                     </Label>
                     <Textarea
-                      id="adminMessage"
-                      placeholder="Add a message to explain your decision..."
-                      value={adminMessage}
-                      onChange={(e) => setAdminMessage(e.target.value)}
+                      id="rejectionReason"
+                      placeholder="Provide a brief reason if you are rejecting..."
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
                       rows={3}
+                      ref={reasonRef}
                     />
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="sendEmail"
-                      checked={sendEmail}
-                      onCheckedChange={(checked) =>
-                        setSendEmail(Boolean(checked))
-                      }
-                    />
-                    <Label htmlFor="sendEmail" className="text-sm">
-                      Send notification via email
-                    </Label>
                   </div>
 
                   <div className="flex gap-3 pt-4">
@@ -323,7 +299,7 @@ export function DepositReviewModal({
                     </Button>
                     <Button
                       onClick={() => handleAction("reject")}
-                      disabled={isProcessing}
+                      disabled={isProcessing || !rejectionReason.trim()}
                       className="flex-1 gap-2"
                       variant="destructive"
                     >

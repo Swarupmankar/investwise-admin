@@ -8,7 +8,7 @@ import { useWithdrawalsData } from "@/hooks/useWithdrawalsData";
 import { WithdrawalFilters } from "@/components/withdrawals/WithdrawalFilters";
 import { WithdrawalsTable } from "@/components/withdrawals/WithdrawalsTable";
 import { WithdrawalReviewModal } from "@/components/withdrawals/WithdrawalReviewModal";
-import type { WithdrawalFilters as UIFilters } from "@/types/withdrawal"; // ✅ use the same type the component expects
+import type { WithdrawalFilters as UIFilters } from "@/types/withdrawal";
 
 export default function Withdrawals() {
   // ✅ state now uses WithdrawalFilters with Date objects
@@ -56,31 +56,22 @@ export default function Withdrawals() {
   const handleApprove = async (
     id: number | string,
     adminMessage?: string,
-    tronScanLink?: string,
-    emailSent?: boolean
+    tronScanLink?: string
   ) => {
     try {
       // no status change here
       setModalOpen(false);
       setSelectedWithdrawal(null);
-    } catch (err) {
-      console.error("Approve (no-op) failed", err);
-    }
+    } catch (err) {}
   };
 
   // Reject: send REJECTED (unchanged)
-  const handleReject = async (
-    id: number | string,
-    adminMessage?: string,
-    emailSent?: boolean
-  ) => {
+  const handleReject = async (id: number | string, adminMessage?: string) => {
     try {
-      await updateWithdrawalStatus(id, "REJECTED");
+      await updateWithdrawalStatus(id, "REJECTED", adminMessage);
       setModalOpen(false);
       setSelectedWithdrawal(null);
-    } catch (err) {
-      console.error("Reject failed", err);
-    }
+    } catch (err) {}
   };
 
   // Mark as Completed: send APPROVED (this updates status)
@@ -89,9 +80,7 @@ export default function Withdrawals() {
       await updateWithdrawalStatus(id, "APPROVED");
       setModalOpen(false);
       setSelectedWithdrawal(null);
-    } catch (err) {
-      console.error("Mark reviewed failed", err);
-    }
+    } catch (err) {}
   };
 
   const handleCloseModal = () => {

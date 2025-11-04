@@ -193,14 +193,23 @@ export function useWithdrawalsData() {
   );
 
   const updateWithdrawalStatus = useCallback(
-    async (id: number | string, friendlyStatus: string) => {
+    async (
+      id: number | string,
+      friendlyStatus: string,
+      rejectionReason?: string
+    ) => {
       const numericId = typeof id === "number" ? id : Number(id);
       const s = (friendlyStatus ?? "").toString().trim().toUpperCase();
+
       try {
         await updateWithdrawalStatusMutation({
           transactionId: numericId,
           status: s,
+          ...(s === "REJECTED" && rejectionReason?.trim()
+            ? { rejectionReason: rejectionReason.trim() }
+            : {}),
         }).unwrap();
+
         await refetchWithdrawals();
       } catch (err) {
         console.error("Failed updateWithdrawalStatus", err);

@@ -27,16 +27,26 @@ export const depositsApi = baseApi.injectEndpoints({
           : [{ type: "Deposits", id: "LIST" }],
     }),
 
-    // status can be "APPROVED" | "REJECTED"
+    // status can be "APPROVED" | "REJECTED"; when REJECTED, include rejectionReason
     updateDepositStatus: build.mutation<
       any,
-      { transactionId: number; status: "APPROVED" | "REJECTED" }
+      {
+        transactionId: number;
+        status: "APPROVED" | "REJECTED";
+        rejectionReason?: string;
+      }
     >({
-      query: ({ transactionId, status }) => {
+      query: ({ transactionId, status, rejectionReason }) => {
         return {
           url: ENDPOINTS.DEPOSITS.APPROVE_DEPOSITS,
           method: "PATCH",
-          data: { transactionId, status },
+          data: {
+            transactionId,
+            status,
+            ...(status === "REJECTED" && rejectionReason
+              ? { rejectionReason }
+              : {}),
+          },
         };
       },
       invalidatesTags: [{ type: "Deposits", id: "LIST" }],
