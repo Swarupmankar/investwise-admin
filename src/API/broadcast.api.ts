@@ -1,9 +1,5 @@
 // src/API/broadcast.api.ts
-import {
-  NewsPost,
-  NotificationItem,
-  AllNewsPost,
-} from "@/types/broadcast/news.types";
+import { NewsPost, NotificationItem } from "@/types/broadcast/news.types";
 import { baseApi } from "./baseApi";
 import { ENDPOINTS } from "@/constants/apiEndpoints";
 
@@ -97,7 +93,7 @@ export const broadcastApi = baseApi.injectEndpoints({
       query: (formData) => ({
         url: ENDPOINTS.BROADCAST.CREATE_NOTIFICATION,
         method: "POST",
-        body: formData, // <-- use body
+        data: formData,
       }),
       invalidatesTags: [
         { type: "Notification", id: "LIST" },
@@ -113,7 +109,7 @@ export const broadcastApi = baseApi.injectEndpoints({
       query: ({ id, data }) => ({
         url: ENDPOINTS.BROADCAST.EDIT_NOTIFICATION(id),
         method: "PATCH",
-        body: data, // <-- use body
+        data,
       }),
       invalidatesTags: [
         { type: "Notification", id: "LIST" },
@@ -138,7 +134,7 @@ export const broadcastApi = baseApi.injectEndpoints({
       query: ({ id, data }) => ({
         url: ENDPOINTS.BROADCAST.EDIT_REPORT(id),
         method: "PATCH",
-        body: data, // <-- use body
+        data,
       }),
       invalidatesTags: [
         { type: "Broadcast", id: "LIST" },

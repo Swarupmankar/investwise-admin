@@ -1,4 +1,3 @@
-// src/components/news/CommonPushForm.tsx
 import React, { useState } from "react";
 import {
   Card,
@@ -12,14 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Bell,
-  Upload,
-  X,
-  FileText,
-  File,
-  Image as ImageIcon,
-} from "lucide-react";
+import { Bell, FileText, File, Image as ImageIcon } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -34,7 +26,7 @@ const NOTIFICATION_TYPES = [
   "UPDATE",
   "PROMOTION",
   "ALERT",
-  "MAINTAINANCE",
+  "MAINTENANCE",
 ] as const;
 
 type AttachedPreview = {
@@ -180,7 +172,7 @@ export function CommonPushForm() {
       formData.append("title", title.trim());
       formData.append("description", message.trim());
       formData.append("userNotificationType", userNotificationType);
-      formData.append("targetAudience", "ALL"); // hardcoded (not shown in UI)
+      formData.append("targetAudience", "ALL");
 
       if (firstSelectedFile) formData.append("file", firstSelectedFile);
 
