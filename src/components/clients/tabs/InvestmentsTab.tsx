@@ -1,4 +1,6 @@
+// src/components/clients/tabs/InvestmentsTab.tsx
 import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -26,37 +28,26 @@ import { useToast } from "@/hooks/use-toast";
 import {
   usePauseInvestmentMutation,
   useResumeInvestmentMutation,
+  useGetClientReturnsHistoryQuery,
 } from "@/API/users.api";
 
-/**
- * Helper: safely convert string|number|undefined to a number
- */
+/* ---------- helpers (kept from your original) ---------- */
 const toNumber = (v?: string | number | null) => {
   if (v === undefined || v === null) return 0;
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
   const n = parseFloat(String(v).replace(/,/g, ""));
   return Number.isFinite(n) ? n : 0;
 };
-
-/**
- * Helper: safe lowercase string for searching
- */
 const norm = (v?: unknown) =>
   v === null || v === undefined ? "" : String(v).toLowerCase();
-
 const capitalize = (s?: string) =>
   !s ? "" : String(s).charAt(0).toUpperCase() + String(s).slice(1);
-
-const firstOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
 const firstOfNextMonth = (d: Date) =>
   new Date(d.getFullYear(), d.getMonth() + 1, 1);
 const daysInMonth = (d: Date) =>
   new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-
 const isSameYearMonth = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
-
-/** exclusive of the end date (25th → 1st next = remaining days in month) */
 const diffCalendarDays = (end: Date, start: Date) => {
   const MS = 24 * 60 * 60 * 1000;
   const a = new Date(
@@ -71,6 +62,7 @@ const diffCalendarDays = (end: Date, start: Date) => {
   ).getTime();
   return Math.round((a - b) / MS);
 };
+/* -------------------------------------------------------- */
 
 interface InvestmentsTabProps {
   investments: UserInvestmentApi[];
@@ -81,31 +73,42 @@ export function InvestmentsTab({
   investments = [],
   onChangeStatus,
 }: InvestmentsTabProps) {
+  // derive `id` from route params (keeps ClientProfile unchanged)
+  const { id } = useParams<{ id?: string }>();
+  const parsedId = useMemo(() => {
+    if (!id) return NaN;
+    const n = Number(id);
+    return Number.isFinite(n) ? n : NaN;
+  }, [id]);
+
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [openId, setOpenId] = useState<number | null>(null);
   const { toast } = useToast();
 
+  // NEW filter controls: month, year and investment selection (from returns-history)
+  // Select uses strings, so store as strings
+  const [selectedMonth, setSelectedMonth] = useState<string>("all"); // "1".."12" or "all"
+  const [selectedYear, setSelectedYear] = useState<string>("all"); // "2025" or "all"
+  const [selectedInvestmentId, setSelectedInvestmentId] =
+    useState<string>("all"); // "all" or "123"
+
   // RTK mutations
   const [pauseInvestment] = usePauseInvestmentMutation();
   const [resumeInvestment] = useResumeInvestmentMutation();
 
-  // track pending action per id
+  // pending + local status map (same as your original)
   const [pendingForId, setPendingForId] = useState<number | string | null>(
     null
   );
-
-  // local map of statuses so UI can update immediately (optimistic)
   const [statusById, setStatusById] = useState<Record<string, string>>({});
 
-  // Sync local status map whenever investments prop changes
   useEffect(() => {
     const map: Record<string, string> = {};
     for (const inv of investments || []) {
       if (inv?.id != null) map[String(inv.id)] = inv.investmentStatus ?? "";
     }
     setStatusById((prev) => {
-      // avoid unnecessary resets if identical
       const keys = Object.keys(map);
       const prevKeys = Object.keys(prev);
       if (
@@ -118,12 +121,167 @@ export function InvestmentsTab({
     });
   }, [investments]);
 
+  // CALL THE NEW HOOK USING `id` (number). Skip if route id invalid
+  const {
+    data: returnsHistory,
+    isLoading: returnsHistoryLoading,
+    isError: returnsHistoryError,
+  } = useGetClientReturnsHistoryQuery(parsedId, {
+    skip: Number.isNaN(parsedId),
+  });
+
+  // Build investment id options from returnsHistory (unique, sorted by id)
+  const investmentOptions = useMemo(() => {
+    if (!returnsHistory) return [{ label: "All", value: "all" }];
+    const opts = returnsHistory
+      .map((r) => ({
+        label: `${r.investmentId} — ${r.name}`,
+        value: String(r.investmentId),
+      }))
+      // dedupe just in case
+      .filter((v, i, arr) => arr.findIndex((x) => x.value === v.value) === i);
+    return [{ label: "All", value: "all" }, ...opts];
+  }, [returnsHistory]);
+
+  // helper: find a returns-history record for an investment
+  const findReturnsEntry = (investmentId: number | string) =>
+    returnsHistory?.find(
+      (r) => Number(r.investmentId) === Number(investmentId)
+    );
+
+  // helper: look up history item for a given investment & month/year (numbers expected)
+  const lookupHistoryAmount = (
+    investmentId: number | string,
+    monthStr?: string,
+    yearStr?: string
+  ) => {
+    if (!returnsHistory) return undefined;
+    if (!monthStr || !yearStr) return undefined;
+    if (monthStr === "all" || yearStr === "all") return undefined;
+    const month = parseInt(monthStr, 10);
+    const year = parseInt(yearStr, 10);
+    if (Number.isNaN(month) || Number.isNaN(year)) return undefined;
+    const entry = findReturnsEntry(investmentId);
+    if (!entry || !entry.history) return undefined;
+    const found = entry.history.find(
+      (h) => h.month === month && h.year === year
+    );
+    return found ? found.amount : undefined;
+  };
+
+  // Received last month map (still useful)
+  const receivedLastMonthByInvestmentId = useMemo(() => {
+    const map: Record<number, boolean> = {};
+    if (!returnsHistory) return map;
+
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lmMonth = lastMonth.getMonth() + 1;
+    const lmYear = lastMonth.getFullYear();
+
+    for (const item of returnsHistory) {
+      const found = (item.history || []).some(
+        (h) => h.month === lmMonth && h.year === lmYear
+      );
+      map[item.investmentId] = found;
+    }
+    return map;
+  }, [returnsHistory]);
+
+  // Compute monthly totals when month+year are selected
+  const { monthlyTotalAll, monthlyTotalFiltered } = useMemo(() => {
+    let totalAll = 0;
+    let totalFiltered = 0;
+
+    if (!returnsHistory || selectedMonth === "all" || selectedYear === "all") {
+      return { monthlyTotalAll: 0, monthlyTotalFiltered: 0 };
+    }
+
+    const month = parseInt(selectedMonth, 10);
+    const year = parseInt(selectedYear, 10);
+    if (Number.isNaN(month) || Number.isNaN(year)) {
+      return { monthlyTotalAll: 0, monthlyTotalFiltered: 0 };
+    }
+
+    // total across all investments in returnsHistory
+    for (const r of returnsHistory) {
+      const sumForR = (r.history ?? [])
+        .filter((h) => h.month === month && h.year === year)
+        .reduce((s, h) => s + toNumber(h.amount), 0);
+      totalAll += sumForR;
+    }
+
+    // total across filtered investments (respecting selectedInvestmentId if set)
+    const invsToInclude = new Set<number>();
+    const q = norm(query).trim();
+    for (const i of investments || []) {
+      // status filter with archived mapping
+      const statusOk =
+        status === "all"
+          ? true
+          : status === "archived"
+          ? ["archived", "completed"].includes(norm(i.investmentStatus))
+          : norm(i.investmentStatus) === status;
+      if (!statusOk) continue;
+
+      // search filter
+      if (
+        !(
+          norm(i.id).includes(q) ||
+          norm(i.name).includes(q) ||
+          norm(i.investmentStatus).includes(q)
+        )
+      )
+        continue;
+
+      // investment selector filter
+      if (selectedInvestmentId && selectedInvestmentId !== "all") {
+        if (String(i.id) !== selectedInvestmentId) continue;
+      }
+
+      // month/year requirement (we only include if returns-history has entry)
+      const entry = findReturnsEntry(i.id);
+      if (!entry) continue;
+      const hasForMonth = (entry.history ?? []).some(
+        (h) => h.month === month && h.year === year
+      );
+      if (!hasForMonth) continue;
+
+      invsToInclude.add(Number(i.id));
+    }
+
+    for (const r of returnsHistory) {
+      if (!invsToInclude.has(Number(r.investmentId))) continue;
+      const sumForR = (r.history ?? [])
+        .filter((h) => h.month === month && h.year === year)
+        .reduce((s, h) => s + toNumber(h.amount), 0);
+      totalFiltered += sumForR;
+    }
+
+    return { monthlyTotalAll: totalAll, monthlyTotalFiltered: totalFiltered };
+  }, [
+    returnsHistory,
+    selectedMonth,
+    selectedYear,
+    investments,
+    query,
+    status,
+    selectedInvestmentId,
+  ]);
+
+  // Main filtered dataset: applies search, status (with archived mapping), month/year and investment id filters
   const data = useMemo(() => {
     const q = norm(query).trim();
+    const invFilter = selectedInvestmentId.trim();
 
-    return (investments || [])
+    const filtered = (investments || [])
       .filter((i) =>
-        status === "all" ? true : norm(i.investmentStatus) === status
+        status === "all"
+          ? true
+          : // "archived" UI value should match backend 'archived' or 'completed'
+          status === "archived"
+          ? ["archived", "completed"].includes(norm(i.investmentStatus))
+          : norm(i.investmentStatus) === status
       )
       .filter((i) => {
         // search by numeric id, name and status (safe coercions)
@@ -132,16 +290,42 @@ export function InvestmentsTab({
           norm(i.name).includes(q) ||
           norm(i.investmentStatus).includes(q)
         );
-      });
-  }, [investments, status, query]);
+      })
+      .filter((i) => {
+        // if an investment is selected from returnsHistory select, restrict to it
+        if (invFilter && invFilter !== "all") {
+          if (String(i.id) !== invFilter) return false;
+        }
 
-  // totals and stats (use safe number parsing)
+        // if both month & year specified -> require returns-history entry for that month/year
+        if (selectedMonth !== "all" && selectedYear !== "all") {
+          const amt = lookupHistoryAmount(i.id, selectedMonth, selectedYear);
+          return amt !== undefined; // show only if a record exists for that month/year
+        }
+
+        // otherwise no month/year restriction
+        return true;
+      });
+
+    return filtered;
+  }, [
+    investments,
+    status,
+    query,
+    selectedMonth,
+    selectedYear,
+    selectedInvestmentId,
+    returnsHistory,
+  ]);
+
+  // stats + helpers (same as original)
   const total = (investments || []).reduce((s, i) => s + toNumber(i.amount), 0);
   const active = (investments || []).filter(
     (i) => norm(i.investmentStatus) === "active"
   ).length;
-  const completed = (investments || []).filter(
-    (i) => norm(i.investmentStatus) === "completed"
+  // "archived" refers to completed or archived
+  const archivedCount = (investments || []).filter((i) =>
+    ["completed", "archived"].includes(norm(i.investmentStatus))
   ).length;
   const avgRoi =
     investments && investments.length
@@ -217,9 +401,7 @@ export function InvestmentsTab({
         onChangeStatus?.(investmentId, "active");
       }
     } catch (err: any) {
-      // rollback on error
       setStatusById((s) => ({ ...s, [key]: prevStatus }));
-      console.error("Pause/Resume failed:", err);
       toast({
         title: `${action === "pause" ? "Pause" : "Resume"} failed`,
         description: err?.data?.message || err?.message || "Please try again.",
@@ -230,9 +412,44 @@ export function InvestmentsTab({
     }
   };
 
+  // Prepare month and year options for selects (string values)
+  const monthOptions = useMemo(
+    () => [
+      { label: "All", value: "all" },
+      { label: "Jan", value: "1" },
+      { label: "Feb", value: "2" },
+      { label: "Mar", value: "3" },
+      { label: "Apr", value: "4" },
+      { label: "May", value: "5" },
+      { label: "Jun", value: "6" },
+      { label: "Jul", value: "7" },
+      { label: "Aug", value: "8" },
+      { label: "Sep", value: "9" },
+      { label: "Oct", value: "10" },
+      { label: "Nov", value: "11" },
+      { label: "Dec", value: "12" },
+    ],
+    []
+  );
+
+  const yearOptions = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const years: { label: string; value: string }[] = [
+      { label: "All", value: "all" },
+    ];
+    // show last 5 years by default (including current)
+    for (let y = currentYear; y >= currentYear - 4; y--) {
+      years.push({ label: String(y), value: String(y) });
+    }
+    return years;
+  }, []);
+
+  const monthYearSelected = selectedMonth !== "all" && selectedYear !== "all";
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
         <Card>
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground">
@@ -251,8 +468,8 @@ export function InvestmentsTab({
 
         <Card>
           <CardContent className="p-3">
-            <div className="text-xs text-muted-foreground">Completed</div>
-            <div className="text-sm font-medium">{completed}</div>
+            <div className="text-xs text-muted-foreground">Archived</div>
+            <div className="text-sm font-medium">{archivedCount}</div>
           </CardContent>
         </Card>
 
@@ -265,6 +482,7 @@ export function InvestmentsTab({
           </CardContent>
         </Card>
 
+        {/* This Month Pro-Rated */}
         <Card>
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground">
@@ -275,13 +493,30 @@ export function InvestmentsTab({
             </div>
           </CardContent>
         </Card>
+
+        {/* NEW: Total received for selected month — placed beside This Month Pro-Rated */}
+        <Card>
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground">
+              Total Received (Selected Mo)
+            </div>
+            <div className="text-sm font-medium">
+              {monthYearSelected ? formatCurrency(monthlyTotalAll) : "—"}
+            </div>
+            {monthYearSelected && selectedInvestmentId !== "all" && (
+              <div className="text-xs text-muted-foreground mt-1">
+                Selected Inv: {formatCurrency(monthlyTotalFiltered)}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <CardTitle>Investments</CardTitle>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap items-center">
             <Input
               placeholder="Search ID or name..."
               className="h-8 w-[180px]"
@@ -296,15 +531,65 @@ export function InvestmentsTab({
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                {/* Archived (UI) maps to backend 'archived' or 'completed' */}
+                <SelectItem value="archived">Archived</SelectItem>
                 <SelectItem value="paused">Paused</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Month/Year filters */}
+            <Select
+              value={selectedMonth}
+              onValueChange={(v) => setSelectedMonth(String(v))}
+            >
+              <SelectTrigger className="h-8 w-[120px]">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map((m) => (
+                  <SelectItem key={String(m.value)} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={selectedYear}
+              onValueChange={(v) => setSelectedYear(String(v))}
+            >
+              <SelectTrigger className="h-8 w-[100px]">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((y) => (
+                  <SelectItem key={String(y.value)} value={y.value}>
+                    {y.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Investment selector populated from returns-history response */}
+            <Select
+              value={selectedInvestmentId}
+              onValueChange={(v) => setSelectedInvestmentId(String(v))}
+            >
+              <SelectTrigger className="h-8 w-[220px]">
+                <SelectValue placeholder="Investment" />
+              </SelectTrigger>
+              <SelectContent>
+                {investmentOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
         </CardHeader>
 
         <CardContent className="p-0">
-          {/* horizontal scroll on small screens + fixed table layout for stable columns */}
           <div className="overflow-x-auto">
             <Table className="min-w-full table-fixed">
               <TableHeader>
@@ -323,6 +608,14 @@ export function InvestmentsTab({
                   <TableHead className="w-[140px] text-right">
                     Lifetime Return
                   </TableHead>
+
+                  {/* show this column only when a month+year is selected */}
+                  {monthYearSelected && (
+                    <TableHead className="w-[140px]">
+                      Return (Selected Mo)
+                    </TableHead>
+                  )}
+
                   <TableHead className="w-[120px] text-center">
                     Actions
                   </TableHead>
@@ -331,27 +624,29 @@ export function InvestmentsTab({
 
               <TableBody>
                 {data.map((i) => {
-                  const id = i.id;
+                  const idNum = i.id;
                   const isPending =
                     pendingForId !== null &&
-                    String(pendingForId) === String(id);
-                  // prefer local status if present, otherwise use prop
+                    String(pendingForId) === String(idNum);
                   const currentStatus =
-                    statusById[String(id)] ?? i.investmentStatus;
+                    statusById[String(idNum)] ?? i.investmentStatus;
                   const isPaused = norm(currentStatus) === "paused";
 
+                  // selected month/year lookup
+                  const selectedReturnAmount = monthYearSelected
+                    ? lookupHistoryAmount(idNum, selectedMonth, selectedYear)
+                    : undefined;
+
                   return (
-                    <TableRow key={id}>
+                    <TableRow key={idNum}>
                       <TableCell className="font-mono text-xs whitespace-nowrap">
-                        {id}
+                        {idNum}
                       </TableCell>
 
-                      {/* Name: allow truncation */}
                       <TableCell className="max-w-[250px] truncate">
                         <div className="truncate">{i.name ?? "-"}</div>
                       </TableCell>
 
-                      {/* Numeric: right aligned, no wrapping */}
                       <TableCell className="text-right whitespace-nowrap">
                         {formatCurrency(toNumber(i.amount))}
                       </TableCell>
@@ -375,6 +670,14 @@ export function InvestmentsTab({
                       <TableCell className="text-right whitespace-nowrap">
                         {formatCurrency(toNumber(i.returnsBalance))}
                       </TableCell>
+
+                      {monthYearSelected && (
+                        <TableCell className="text-right whitespace-nowrap">
+                          {selectedReturnAmount !== undefined
+                            ? formatCurrency(toNumber(selectedReturnAmount))
+                            : "-"}
+                        </TableCell>
+                      )}
 
                       <TableCell className="text-center whitespace-nowrap">
                         <div className="inline-flex items-center gap-1">
@@ -419,6 +722,16 @@ export function InvestmentsTab({
                     </TableRow>
                   );
                 })}
+                {data.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={monthYearSelected ? 11 : 10}
+                      className="text-center py-6"
+                    >
+                      No investments match the selected filters.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
@@ -436,6 +749,7 @@ export function InvestmentsTab({
         investment={
           investments.find((inv) => Number(inv.id) === openId) ?? null
         }
+        returnsHistory={returnsHistory ?? undefined}
       />
     </div>
   );

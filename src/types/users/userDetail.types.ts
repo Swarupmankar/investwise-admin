@@ -107,3 +107,17 @@ export interface UserDetailApi {
   totalWithdrawals?: string | number;
   totalInvested?: string | number;
 }
+
+export interface ReturnsHistoryItem {
+  id: number;
+  investmentId: number;
+  name: string;
+  amount: string;
+  history: {
+    id: number;
+    month: number; // 1-12
+    year: number;
+    amount: string;
+    createdAt: string;
+  }[];
+}

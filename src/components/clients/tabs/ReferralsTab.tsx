@@ -1,4 +1,3 @@
-// src/components/clients/tabs/ReferralsTab.tsx
 import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -17,19 +16,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency } from "@/lib/formatters";
 import { UnderWhomTree } from "@/components/clients/UnderWhomTree";
-
 import { useGetReferralByUserIdQuery } from "@/API/referral.api";
-import type {
-  ReferralListItem,
-  ReferralOverviewResponse,
-} from "@/types/users/referral.types";
+import type { ReferralListItem } from "@/types/users/referral.types";
 
 interface ReferralsTabProps {
   userId: number;
   clientName: string;
 }
+
+type FlatRow = {
+  user: ReferralListItem;
+  investment: NonNullable<ReferralListItem["referredInvestments"][0]>;
+};
 
 export function ReferralsTab({ userId, clientName }: ReferralsTabProps) {
   const [query, setQuery] = useState("");
@@ -39,17 +39,7 @@ export function ReferralsTab({ userId, clientName }: ReferralsTabProps) {
     skip: !userId,
   });
 
-  const normalized: {
-    stats: {
-      totalReferrals: number;
-      bonusEarned: number;
-      paidOut: number;
-      pending: number;
-      totalActiveInvestments: number;
-    };
-    referralsList: ReferralListItem[];
-    underWhom: any;
-  } = useMemo(() => {
+  const normalized = useMemo(() => {
     if (!data) {
       return {
         stats: {
@@ -59,8 +49,8 @@ export function ReferralsTab({ userId, clientName }: ReferralsTabProps) {
           pending: 0,
           totalActiveInvestments: 0,
         },
-        referralsList: [],
-        underWhom: { referrer: null, referrerChildren: [] },
+        referralsList: [] as ReferralListItem[],
+        underWhom: { referrer: null, referrerChildren: [] as any[] },
       };
     }
 
@@ -74,7 +64,14 @@ export function ReferralsTab({ userId, clientName }: ReferralsTabProps) {
     };
 
     const referralsList = Array.isArray(data.referralsList)
-      ? data.referralsList
+      ? data.referralsList.map((r: any) => ({
+          ...r,
+          referredInvestments: Array.isArray(r.referredInvestments)
+            ? r.referredInvestments
+            : r.referredInvestment
+            ? [r.referredInvestment]
+            : [],
+        }))
       : [];
 
     const underWhom = data.underWhom ?? {
@@ -85,49 +82,53 @@ export function ReferralsTab({ userId, clientName }: ReferralsTabProps) {
     return { stats, referralsList, underWhom };
   }, [data]);
 
-  // Derived filtered list (only depends on stable refs above)
-  const filtered: ReferralListItem[] = useMemo(() => {
-    const list = normalized.referralsList ?? [];
-    return list
-      .filter((r) => {
-        if (status === "all") return true;
-        const invStatus = (r.referredInvestment?.status ?? "").toLowerCase();
-        return status === "paid"
-          ? invStatus === "paid"
-          : status === "unpaid"
-          ? invStatus !== "paid"
-          : true;
-      })
-      .filter((r) =>
-        (r.referredUserName ?? "").toLowerCase().includes(query.toLowerCase())
+  const flatRows: FlatRow[] = useMemo(() => {
+    const rows: FlatRow[] = [];
+    for (const user of normalized.referralsList) {
+      const investments = user.referredInvestments ?? [];
+      for (const inv of investments) {
+        rows.push({ user, investment: inv });
+      }
+    }
+    return rows;
+  }, [normalized.referralsList]);
+
+  const filtered = useMemo(() => {
+    return flatRows.filter((row) => {
+      const invStatus = (row.investment.status ?? "").toLowerCase();
+      if (status === "paid" && invStatus !== "paid") return false;
+      if (status === "unpaid" && invStatus === "paid") return false;
+
+      const q = query.trim().toLowerCase();
+      if (!q) return true;
+      const userName = (row.user.referredUserName ?? "").toLowerCase();
+      const userEmail = (row.user.referredUserEmail ?? "").toLowerCase();
+      const invName = (row.investment.name ?? "").toLowerCase();
+      return (
+        userName.includes(q) || userEmail.includes(q) || invName.includes(q)
       );
-  }, [normalized.referralsList, status, query]);
+    });
+  }, [flatRows, status, query]);
 
-  // --- UI render early returns (safe because hooks are already called above) ---
-  if (!userId) {
-    return <div>No user selected</div>;
-  }
-
-  if (isLoading) {
-    return <div>Loading referrals…</div>;
-  }
-
+  if (!userId) return <div>No user selected</div>;
+  if (isLoading) return <div>Loading referrals…</div>;
   if (error) {
     console.error("ReferralsTab API error:", error);
     return <div>Error loading referral data</div>;
   }
+  if (!data) return <div>No referral data</div>;
 
-  if (!data) {
-    return <div>No referral data</div>;
-  }
-
-  // Finally use normalized data for rendering
   const { stats, underWhom } = normalized;
+
+  const computePercentAmount = (amountStr: string | undefined, pct: number) => {
+    const amt = Number(amountStr ?? "0");
+    if (!Number.isFinite(amt) || amt === 0) return 0;
+    return +(amt * pct);
+  };
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
       <div className="xl:col-span-2 space-y-6">
-        {/* Stats cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           <Card>
             <CardContent className="p-3">
@@ -166,14 +167,13 @@ export function ReferralsTab({ userId, clientName }: ReferralsTabProps) {
           </Card>
         </div>
 
-        {/* Referrals table */}
         <Card>
           <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <CardTitle>Referrals</CardTitle>
             <div className="flex gap-2">
               <Input
-                placeholder="Search user..."
-                className="h-8 w-[180px]"
+                placeholder="Search user or investment..."
+                className="h-8 w-[240px]"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -195,61 +195,89 @@ export function ReferralsTab({ userId, clientName }: ReferralsTabProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Referred User</TableHead>
-                  <TableHead className="text-right">Account Balance</TableHead>
+                  {/* Changed header label: Invested Amount (shows investment.amount) */}
+                  <TableHead className="text-right">Invested Amount</TableHead>
                   <TableHead className="text-right">Total Invested</TableHead>
-                  <TableHead>Referred Investment</TableHead>
-                  <TableHead className="text-right">
-                    Eligible Bonus (1%)
-                  </TableHead>
+                  <TableHead>Investment</TableHead>
+                  <TableHead className="text-right">Eligible (1%)</TableHead>
+                  <TableHead className="text-right">Eligible (5%)</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Credited On</TableHead>
+                  <TableHead className="text-right">Referral Earned</TableHead>
                 </TableRow>
               </TableHeader>
 
               <TableBody>
-                {filtered.map((r) => (
-                  <TableRow key={r.referredUserId}>
-                    <TableCell>{r.referredUserName ?? "—"}</TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(Number(r.accountBalance ?? "0"))}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(Number(r.totalInvested ?? "0"))}
-                    </TableCell>
-                    <TableCell>
-                      {r.referredInvestment ? (
+                {filtered.map((row) => {
+                  const u = row.user;
+                  const inv = row.investment;
+                  const key = `${u.referredUserId}-${inv.investmentId}`;
+
+                  const onePct = computePercentAmount(inv.amount, 0.01);
+                  const fivePct = computePercentAmount(inv.amount, 0.05);
+
+                  const type = inv.referralInvestmentType ?? "";
+                  const showOne = type === "ReferralOnePercent";
+                  const showFive = type === "ReferralThreeMonths";
+
+                  return (
+                    <TableRow key={key}>
+                      <TableCell>
+                        <div className="font-medium">
+                          {u.referredUserName ?? "—"}
+                        </div>
+                        <div className="text-muted-foreground text-xs">
+                          {u.referredUserEmail ?? ""}
+                        </div>
+                      </TableCell>
+
+                      {/* Invested Amount (per investment.amount) */}
+                      <TableCell className="text-right">
+                        {formatCurrency(Number(inv.amount ?? "0"))}
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        {formatCurrency(Number(u.totalInvested ?? "0"))}
+                      </TableCell>
+
+                      <TableCell>
                         <div className="text-sm">
-                          <div className="font-medium">
-                            {r.referredInvestment.name}
-                          </div>
+                          <div className="font-medium">{inv.name}</div>
                           <div className="text-muted-foreground">
-                            {formatCurrency(
-                              Number(r.referredInvestment.amount ?? "0")
-                            )}{" "}
-                            • {r.referredInvestment.status}
+                            {inv.status}
                           </div>
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(
-                        Number(r.referredInvestment?.eligibleBonus1Pct ?? "0")
-                      )}
-                    </TableCell>
-                    <TableCell className="capitalize">
-                      {r.referredInvestment?.activeLabel ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      {r.referredInvestment?.creditedOn
-                        ? formatDate(r.referredInvestment.creditedOn)
-                        : "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        {showOne && onePct > 0 ? formatCurrency(onePct) : "—"}
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        {showFive && fivePct > 0
+                          ? formatCurrency(fivePct)
+                          : "—"}
+                      </TableCell>
+
+                      <TableCell className="capitalize">
+                        {inv.activeLabel ?? inv.status ?? "—"}
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        {inv.referralEarningAmount
+                          ? formatCurrency(Number(inv.referralEarningAmount))
+                          : "—"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
+
+            {filtered.length === 0 && (
+              <div className="mt-4 text-center text-muted-foreground">
+                No referrals found
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

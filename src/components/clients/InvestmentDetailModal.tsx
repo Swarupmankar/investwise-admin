@@ -13,7 +13,13 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 import { formatCurrency, formatDate } from "@/lib/formatters";
-import type { UserInvestmentApi } from "@/types/users/userDetail.types";
+import type {
+  ReturnsHistoryItem,
+  UserInvestmentApi,
+} from "@/types/users/userDetail.types";
+
+import { useParams } from "react-router-dom";
+import { useGetClientReturnsHistoryQuery } from "@/API/users.api";
 
 /** ---------- Helpers (robust number + monthly cycle) ---------- */
 const parseAmountRobust = (v: unknown): number => {
@@ -104,12 +110,19 @@ interface InvestmentDetailModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   investment?: UserInvestmentApi | null;
+  /**
+   * Optional: pass clientId explicitly (route param is used by default)
+   */
+  clientId?: number;
+  returnsHistory?: ReturnsHistoryItem[] | undefined;
 }
 
 export function InvestmentDetailModal({
   open,
   onOpenChange,
   investment,
+  clientId,
+  returnsHistory: parentReturnsHistory,
 }: InvestmentDetailModalProps) {
   // Always call hooks in the same order on every render
   const [monthlyRoi] = useState(0.05); // 5% monthly
@@ -124,7 +137,7 @@ export function InvestmentDetailModal({
   const principal = parseAmountRobust(investment?.amount);
   const lifetimeReturn = parseAmountRobust(investment?.returnsBalance);
 
-  const cycle = useMemo(() => computeMonthlyCycle(startIso), [startIso]);
+  const cycle = computeMonthlyCycle(startIso);
 
   const monthlyReturn = principal * monthlyRoi;
   const dailyReturn =
@@ -146,6 +159,50 @@ export function InvestmentDetailModal({
   const status = (investment?.investmentStatus ?? "").toString().toLowerCase();
 
   const hasInvestment = !!investment;
+
+  // Determine client id to use for returns-history: prefer explicit prop, otherwise route param
+  const { id: routeId } = useParams<{ id?: string }>();
+  const parsedRouteId = useMemo(() => {
+    if (!routeId) return NaN;
+    const p = Number(routeId);
+    return Number.isFinite(p) ? p : NaN;
+  }, [routeId]);
+
+  const clientIdForQuery =
+    clientId ?? (Number.isFinite(parsedRouteId) ? parsedRouteId : undefined);
+
+  // fetch returns-history only if parent didn't pass it and we have a client id
+  const {
+    data: fetchedReturnsHistory,
+    isLoading: returnsHistoryLoading,
+    isError: returnsHistoryError,
+  } = useGetClientReturnsHistoryQuery(clientIdForQuery ?? 0, {
+    skip: clientIdForQuery === undefined || !!parentReturnsHistory,
+  });
+
+  const returnsHistory = parentReturnsHistory ?? fetchedReturnsHistory ?? [];
+
+  // find the returns-history record for this investment
+  const investmentHistory = useMemo(() => {
+    if (!investment || !returnsHistory) return null;
+    return (
+      returnsHistory.find(
+        (r) => Number(r.investmentId) === Number(investment.id)
+      ) ?? null
+    );
+  }, [investment, returnsHistory]);
+
+  // prepare recent (sorted descending) history rows if available
+  const recentHistoryRows = useMemo(() => {
+    if (!investmentHistory) return [];
+    const rows = (investmentHistory.history ?? []).slice();
+    // sort by year desc, month desc
+    rows.sort((a, b) => {
+      if (b.year !== a.year) return b.year - a.year;
+      return b.month - a.month;
+    });
+    return rows;
+  }, [investmentHistory]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -346,6 +403,68 @@ export function InvestmentDetailModal({
                 </CardContent>
               </Card>
             </div>
+
+            {/* ----------------- RETURNS HISTORY (NEW) ----------------- */}
+            <div className="mt-6">
+              <Card>
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm font-medium">
+                      Recent returns (by month)
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {returnsHistoryLoading
+                        ? "Loading…"
+                        : returnsHistoryError
+                        ? "Error"
+                        : `${recentHistoryRows.length} records`}
+                    </div>
+                  </div>
+
+                  {returnsHistoryLoading ? (
+                    <div className="text-sm text-muted-foreground">
+                      Loading returns history…
+                    </div>
+                  ) : returnsHistoryError ? (
+                    <div className="text-sm text-red-500">
+                      Failed to load returns history.
+                    </div>
+                  ) : recentHistoryRows.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">
+                      No returns history available for this investment.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm table-fixed">
+                        <thead>
+                          <tr className="text-left text-xs text-muted-foreground">
+                            <th className="w-[80px] py-2">Month</th>
+                            <th className="w-[80px] py-2">Year</th>
+                            <th className="py-2 text-right">Amount</th>
+                            <th className="py-2">Recorded At</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recentHistoryRows.map((h) => (
+                            <tr key={h.id} className="border-t">
+                              <td className="py-2">{h.month}</td>
+                              <td className="py-2">{h.year}</td>
+                              <td className="py-2 text-right">
+                                {formatCurrency(Number(h.amount))}
+                              </td>
+                              <td className="py-2">
+                                {h.createdAt ? formatDate(h.createdAt) : "-"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            {/* ------------------------------------------------------- */}
           </>
         )}
       </DialogContent>

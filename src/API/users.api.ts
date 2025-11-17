@@ -2,7 +2,10 @@
 import { ENDPOINTS } from "@/constants/apiEndpoints";
 import { baseApi } from "./baseApi";
 import type { UserApi } from "@/types/users/users.types";
-import { UserDetailApi } from "@/types/users/userDetail.types";
+import {
+  ReturnsHistoryItem,
+  UserDetailApi,
+} from "@/types/users/userDetail.types";
 import { PauseResumeRequest, PauseResumeResponse } from "@/types/client";
 
 export const usersApi = baseApi.injectEndpoints({
@@ -69,6 +72,25 @@ export const usersApi = baseApi.injectEndpoints({
       ],
       transformResponse: (res: unknown) => (res ?? {}) as PauseResumeResponse,
     }),
+
+    //  NEW: getClientReturnsHistory
+    getClientReturnsHistory: build.query<ReturnsHistoryItem[], number>({
+      query: (id: number) => ({
+        url: ENDPOINTS.USERS.USERS_INVESTMENT_HISTORY(id),
+        method: "GET",
+      }),
+      providesTags: (res, _err, id) =>
+        res
+          ? [
+              ...res.map((r) => ({
+                type: "Investment" as const,
+                id: `${id}-${r.investmentId}`,
+              })),
+              { type: "Investment" as const, id: `CLIENT-${id}` },
+            ]
+          : [{ type: "Investment" as const, id: `CLIENT-${id}` }],
+      transformResponse: (res: unknown) => (res ?? []) as ReturnsHistoryItem[],
+    }),
   }),
   overrideExisting: false,
 });
@@ -78,4 +100,5 @@ export const {
   useGetUserByIdQuery,
   usePauseInvestmentMutation,
   useResumeInvestmentMutation,
+  useGetClientReturnsHistoryQuery,
 } = usersApi;

@@ -2,6 +2,8 @@ export const ENDPOINTS = {
   USERS: {
     ALL_USERS: "/admin/clients/all",
     USER_BY_ID: (id: number) => `/admin/clients/client/${id}`,
+    USERS_INVESTMENT_HISTORY: (id: number) =>
+      `/admin/clients/client/returns-history/${id}`,
     REFERRAL: (id: number) => `/admin/clients/referral/${id}`,
     USER_ANSWERS: (id: number) => `/admin/clients/user-answers/${id}`,
     USER_MESSAGE: (id: number | string) => `/admin/notifications/user/${id}`,

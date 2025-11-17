@@ -21,8 +21,9 @@ export type ReferredInvestment = {
   status: string;
   activeLabel?: string;
   eligibleBonus1Pct: string;
-  creditedOn?: string | null;
+  createdAt: string;
   referralEarningAmount?: string;
+  referralInvestmentType?: string;
 };
 
 export type ReferralListItem = {
@@ -31,6 +32,7 @@ export type ReferralListItem = {
   referredUserEmail: string | null;
   accountBalance: string;
   totalInvested: string;
+  referredInvestments: ReferredInvestment[];
   referredInvestment?: ReferredInvestment | null;
 };
 
