@@ -1,4 +1,17 @@
-import { BarChart3, Users, CreditCard, ArrowUpRight, FileText, Megaphone, Vault, LifeBuoy, Wallet, LogOut } from "lucide-react";
+import {
+  BarChart3,
+  Users,
+  CreditCard,
+  ArrowUpRight,
+  FileText,
+  Megaphone,
+  Vault,
+  LifeBuoy,
+  Wallet,
+  LogOut,
+  ArrowDown,
+  ArrowDownRight,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
   Sidebar,
@@ -32,6 +45,11 @@ const navigationItems = [
     title: "Withdrawals",
     url: "/withdrawals",
     icon: ArrowUpRight,
+  },
+  {
+    title: "Investment Withdrawals",
+    url: "/investment-withdrawals",
+    icon: ArrowDownRight,
   },
   {
     title: "Transaction History",
@@ -108,7 +126,9 @@ export function AppSidebar() {
                       }
                     >
                       <item.icon className="w-5 h-5" />
-                      {!isCollapsed && <span className="font-medium">{item.title}</span>}
+                      {!isCollapsed && (
+                        <span className="font-medium">{item.title}</span>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -137,7 +157,9 @@ export function AppSidebar() {
                       }
                     >
                       <item.icon className="w-5 h-5" />
-                      {!isCollapsed && <span className="font-medium">{item.title}</span>}
+                      {!isCollapsed && (
+                        <span className="font-medium">{item.title}</span>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

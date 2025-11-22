@@ -120,6 +120,10 @@ export function ReferralsTab({ userId, clientName }: ReferralsTabProps) {
 
   const { stats, underWhom } = normalized;
 
+  const totalInvestments = flatRows.length;
+  const activeInvestments = stats.totalActiveInvestments ?? 0;
+  const inactiveInvestments = Math.max(0, totalInvestments - activeInvestments);
+
   const computePercentAmount = (amountStr: string | undefined, pct: number) => {
     const amt = Number(amountStr ?? "0");
     if (!Number.isFinite(amt) || amt === 0) return 0;
@@ -133,9 +137,14 @@ export function ReferralsTab({ userId, clientName }: ReferralsTabProps) {
           <Card>
             <CardContent className="p-3">
               <div className="text-xs text-muted-foreground">
-                Total Referrals
+                Total Investments
               </div>
-              <div className="text-sm font-medium">{stats.totalReferrals}</div>
+              <div className="text-sm font-medium">
+                {totalInvestments}{" "}
+                <span className="text-xs text-muted-foreground">
+                  ({activeInvestments} active / {inactiveInvestments} inactive)
+                </span>
+              </div>
             </CardContent>
           </Card>
 

@@ -73,4 +73,9 @@ export const ENDPOINTS = {
     WITHDRAW_PRINCIPAL: "/admin/accounting/withdraw-principal",
     WITHDRAW_HISTORY: "/admin/accounting/withdraw-history",
   },
+
+  INVESTMENTS: {
+    ALL_SETTLEMENTS: "/admin/investments/get-all-settlements",
+    SETTLE_INVESTMENT: "/admin/investments/settle-investment",
+  },
 };
