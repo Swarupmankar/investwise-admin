@@ -15,6 +15,7 @@ import { ReferralsTab } from "@/components/clients/tabs/ReferralsTab";
 import { QuestionnairesTab } from "@/components/clients/tabs/QuestionnairesTab";
 import { MessagesTab } from "@/components/clients/tabs/MessagesTab";
 import { useGetUserByIdQuery } from "@/API/users.api";
+import { useGetReferralByUserIdQuery } from "@/API/referral.api";
 import type {
   UserDetailApi,
   UserInvestmentApi,
@@ -41,6 +42,14 @@ const ClientProfile = () => {
     error,
     isFetching,
   } = useGetUserByIdQuery(numericId ?? 0, {
+    skip: Number.isNaN(numericId),
+  });
+
+  const {
+    data: referralDataForOverview,
+    isLoading: referralLoading,
+    isError: referralError,
+  } = useGetReferralByUserIdQuery(numericId ?? 0, {
     skip: Number.isNaN(numericId),
   });
 
@@ -84,6 +93,11 @@ const ClientProfile = () => {
   const withdrawals = client.withdrawRequests ?? [];
   const referrals = client.Referral ? [client.Referral] : [];
   const messages = client.userNotificationRecipient ?? [];
+  const bonusEarned =
+    referralDataForOverview && referralDataForOverview.stats
+      ? Number(referralDataForOverview.stats.bonusEarned ?? 0)
+      : 0;
+
   const updateInvestmentStatus = async (
     _investmentId: number | string,
     _status: string
@@ -108,6 +122,7 @@ const ClientProfile = () => {
           deposits={deposits}
           withdrawals={withdrawals}
           referrals={referrals}
+          bonusEarned={bonusEarned}
         />
 
         {/* Sticky Actions + Tabs */}

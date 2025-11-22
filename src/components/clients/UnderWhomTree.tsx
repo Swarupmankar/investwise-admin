@@ -17,10 +17,12 @@ export function UnderWhomTree({ clientName, underWhom }: UnderWhomTreeProps) {
           Mini referral graph
         </div>
         <ul className="text-sm space-y-1">
-          <li className="font-medium">{clientName}</li>
+          <li className="font-light">
+            Referred by : <span className="font-medium">{clientName}</span>
+          </li>
           {underWhom.referrer && (
             <li className="pl-4 text-muted-foreground">
-              ↳ Referred by {underWhom.referrer.name}
+              ↳ Referred by {clientName}
             </li>
           )}
           {underWhom.referrerChildren?.map((child) => (
