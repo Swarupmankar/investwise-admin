@@ -17,7 +17,7 @@ import { WithdrawalStatusBadge } from "./WithdrawalStatusBadge";
 import { WalletAddressCopy } from "./WalletAddressCopy";
 import { ScreenshotPreview } from "@/components/deposits/ScreenshotPreview";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, ExternalLink } from "lucide-react";
+import { Upload, ExternalLink, Loader2 } from "lucide-react";
 import { useGetUserByIdQuery } from "@/API/users.api";
 import { useWithdrawalsData } from "@/hooks/useWithdrawalsData";
 
@@ -92,6 +92,11 @@ export function WithdrawalReviewModal({
   const [txId, setTxId] = useState("");
   const { toast } = useToast();
 
+  // additional action-specific loading states to prevent duplicate clicks
+  const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [markingReviewed, setMarkingReviewed] = useState(false);
+
   // helper from central hook
   const { uploadWithdrawProof, isUploading: isUploadingGlobal } =
     useWithdrawalsData();
@@ -111,6 +116,9 @@ export function WithdrawalReviewModal({
       setSelectedFile(null);
       setUploadingLocal(false);
       setTxId("");
+      setApproving(false);
+      setRejecting(false);
+      setMarkingReviewed(false);
     }
   }, [open, withdrawal?.id]);
 
@@ -141,6 +149,10 @@ export function WithdrawalReviewModal({
   };
 
   const doApprove = async () => {
+    // guard: prevent duplicate clicks
+    if (approving) return;
+    setApproving(true);
+
     try {
       setUploadingLocal(true);
 
@@ -151,7 +163,6 @@ export function WithdrawalReviewModal({
           description: "Please select a payment proof screenshot to upload.",
           variant: "destructive",
         });
-        setUploadingLocal(false);
         return;
       }
       if (!txId.trim()) {
@@ -160,26 +171,11 @@ export function WithdrawalReviewModal({
           description: "Please provide the blockchain transaction ID (txId).",
           variant: "destructive",
         });
-        setUploadingLocal(false);
         return;
       }
 
       const txIdClean =
         txId.trim().match(/[A-Fa-f0-9]{16,}/)?.[0] ?? txId.trim();
-
-      console.log("[modal] doApprove → uploadWithdrawProof", {
-        transactionId: withdrawal.id,
-        typeofId: typeof withdrawal.id,
-        txIdInput: txId,
-        txIdClean,
-        file: selectedFile
-          ? {
-              name: selectedFile.name,
-              size: selectedFile.size,
-              type: selectedFile.type,
-            }
-          : null,
-      });
 
       // 1) Upload ONLY the admin proof here
       await uploadWithdrawProof(Number(withdrawal.id), selectedFile, txIdClean);
@@ -189,11 +185,8 @@ export function WithdrawalReviewModal({
         description: "Payment proof uploaded successfully.",
       });
 
-      // 2) Do NOT call onApprove here (no status change on this step)
-      // Close the modal; status will be set when user clicks "Mark as Reviewed / Completed"
       closeModal();
     } catch (err) {
-      console.error("Upload proof failed", err);
       toast({
         title: "Upload failed",
         description: err?.data?.message || "Failed to upload payment proof.",
@@ -201,16 +194,22 @@ export function WithdrawalReviewModal({
       });
     } finally {
       setUploadingLocal(false);
+      setApproving(false);
     }
   };
 
   const doReject = async () => {
+    // guard: prevent duplicate clicks
+    if (rejecting) return;
+    setRejecting(true);
+
     if (!adminMessage || !adminMessage.trim()) {
       toast({
         title: "Message Required",
         description: "Please provide a reason for rejection.",
         variant: "destructive",
       });
+      setRejecting(false);
       return;
     }
     try {
@@ -223,17 +222,21 @@ export function WithdrawalReviewModal({
       });
       closeModal();
     } catch (err) {
-      console.error("Reject failed:", err);
       toast({
         title: "Error",
         description: "Failed to reject withdrawal.",
         variant: "destructive",
       });
+    } finally {
+      setRejecting(false);
     }
   };
 
   const doMarkReviewed = async () => {
     if (!onMarkReviewed) return;
+    // guard: prevent duplicate clicks
+    if (markingReviewed) return;
+    setMarkingReviewed(true);
     try {
       await Promise.resolve(
         onMarkReviewed(withdrawal.id, adminMessage?.trim() || undefined)
@@ -246,12 +249,13 @@ export function WithdrawalReviewModal({
       });
       closeModal();
     } catch (err) {
-      console.error("Mark reviewed failed:", err);
       toast({
         title: "Error",
         description: "Failed to mark as reviewed.",
         variant: "destructive",
       });
+    } finally {
+      setMarkingReviewed(false);
     }
   };
 
@@ -484,16 +488,36 @@ export function WithdrawalReviewModal({
                         className="flex-1"
                         variant="default"
                         onClick={doApprove}
-                        disabled={uploadingLocal || isUploadingGlobal}
+                        disabled={
+                          uploadingLocal ||
+                          isUploadingGlobal ||
+                          approving ||
+                          rejecting // also block while reject in-flight
+                        }
                       >
-                        ✅ Approve
+                        {approving ? (
+                          <>
+                            <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                            Approving...
+                          </>
+                        ) : (
+                          "✅ Approve"
+                        )}
                       </Button>
                       <Button
                         className="flex-1"
                         variant="destructive"
                         onClick={doReject}
+                        disabled={rejecting || approving}
                       >
-                        ❌ Reject
+                        {rejecting ? (
+                          <>
+                            <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                            Rejecting...
+                          </>
+                        ) : (
+                          "❌ Reject"
+                        )}
                       </Button>
                     </div>
                     <div className="mt-2 text-sm text-muted-foreground">
@@ -636,8 +660,16 @@ export function WithdrawalReviewModal({
                       className="mt-3 w-full"
                       variant="default"
                       onClick={doMarkReviewed}
+                      disabled={markingReviewed}
                     >
-                      ✅ Mark as Reviewed / Completed
+                      {markingReviewed ? (
+                        <>
+                          <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                          Marking...
+                        </>
+                      ) : (
+                        "✅ Mark as Reviewed / Completed"
+                      )}
                     </Button>
                   </CardContent>
                 </Card>
