@@ -1,8 +1,10 @@
+// src/hooks/useFinancialData.ts
 import { useCallback, useMemo } from "react";
 import {
   useGetDashboardStatsQuery,
   useGetCurrentBalancesQuery,
   useCreateCurrentBalanceMutation,
+  useGetNetProfitQuery,
 } from "@/API/dashboard.api";
 import {
   CreateCurrentBalancePayload,
@@ -27,6 +29,14 @@ export function useFinancialData() {
     isFetching: balancesFetching,
     refetch: refetchBalances,
   } = useGetCurrentBalancesQuery();
+
+  // NEW: net profit query
+  const {
+    data: netProfitRaw,
+    error: netProfitError,
+    isLoading: netProfitLoading,
+    refetch: refetchNetProfit,
+  } = useGetNetProfitQuery();
 
   const [createMutation, { isLoading: creating }] =
     useCreateCurrentBalanceMutation();
@@ -76,9 +86,12 @@ export function useFinancialData() {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [balancesRaw]);
 
-  const isLoading = statsLoading || balancesLoading;
+  // parsed net profit (from new endpoint)
+  const netProfit = useMemo(() => parseNum(netProfitRaw, 0), [netProfitRaw]);
+
+  const isLoading = statsLoading || balancesLoading || netProfitLoading;
   const isFetching = statsFetching || balancesFetching;
-  const error = statsError ?? balancesError ?? null;
+  const error = statsError ?? balancesError ?? netProfitError ?? null;
 
   const createCurrentBalance = useCallback(
     async (payload: CreateCurrentBalancePayload) => {
@@ -87,19 +100,21 @@ export function useFinancialData() {
         try {
           refetchBalances();
           refetchStats();
+          refetchNetProfit();
         } catch {}
         return { success: true, data: res };
       } catch (err: any) {
         return { success: false, error: err };
       }
     },
-    [createMutation, refetchBalances, refetchStats]
+    [createMutation, refetchBalances, refetchStats, refetchNetProfit]
   );
 
   return {
     stats,
     balances,
-    raw: { stats: statsRaw ?? null, balances: balancesRaw ?? null },
+    netProfit,
+    raw: { stats: statsRaw ?? null, balances: balancesRaw ?? null, netProfit: netProfitRaw ?? null },
     isLoading,
     isFetching,
     creating,
@@ -107,5 +122,6 @@ export function useFinancialData() {
     createCurrentBalance,
     refetchStats,
     refetchBalances,
+    refetchNetProfit,
   } as const;
 }

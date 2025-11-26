@@ -117,12 +117,6 @@ export const AdminTransactionTable = ({
               </h4>
               <p>{formatDate(transaction.date)}</p>
             </div>
-            <div>
-              <h4 className="font-medium text-sm text-muted-foreground mb-1">
-                Admin
-              </h4>
-              <p>{transaction.adminName}</p>
-            </div>
           </div>
 
           <div>
@@ -223,7 +217,6 @@ export const AdminTransactionTable = ({
                   <TableHead>Type</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Purpose</TableHead>
-                  <TableHead>Admin</TableHead>
                   <TableHead>Attachments</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -241,7 +234,6 @@ export const AdminTransactionTable = ({
                     <TableCell className="max-w-[200px] truncate">
                       {transaction.purpose}
                     </TableCell>
-                    <TableCell>{transaction.adminName}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         {transaction.proofScreenshot && (

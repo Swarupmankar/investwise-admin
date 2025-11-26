@@ -8,6 +8,7 @@ import { AdminAccountingFilters } from "@/components/adminAccounting/AdminAccoun
 import { ManualControlsPanel } from "@/components/adminAccounting/ManualControlsPanel";
 import { useAdminAccountingContext } from "@/context/AdminAccountingContext";
 import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 
 const AdminAccounting = () => {
   const {
@@ -41,7 +42,8 @@ const AdminAccounting = () => {
       .getElementById("replenish-form")
       ?.scrollIntoView({ behavior: "smooth" });
   };
-  const handleWithdraw = (
+
+  const handleWithdraw = async (
     type: "net_profit" | "principal",
     amount: number,
     purpose: string,
@@ -49,8 +51,26 @@ const AdminAccounting = () => {
     proofScreenshot?: string,
     tronScanLink?: string
   ) => {
-    addWithdrawal(type, amount, purpose, notes, proofScreenshot, tronScanLink);
-    setWithdrawFormType(null);
+    try {
+      await addWithdrawal(
+        type,
+        amount,
+        purpose,
+        notes,
+        proofScreenshot,
+        tronScanLink
+      );
+
+      setWithdrawFormType(null);
+    } catch (err: any) {
+      // clear any existing toasts (prevents duplicates from other components)
+      toast.dismiss();
+
+      // Show proper error toast. Prefer server message if present.
+      const message =
+        err?.message || (typeof err === "string" ? err : "Failed to withdraw");
+      toast.error(message);
+    }
   };
 
   return (

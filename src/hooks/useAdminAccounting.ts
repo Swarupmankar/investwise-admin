@@ -12,8 +12,9 @@ import {
   useGetRoiDetailsQuery,
   useReplenishPrincipalMutation,
   useWithdrawPrincipalMutation,
-  useGetWithdrawHistoryQuery,
+  useGetWithdrawHistoryQuery, // <-- ADDED: fetch net-profit field
 } from "@/API/accounting.api";
+import { useGetNetProfitQuery } from "@/API/dashboard.api";
 
 export const useAdminAccounting = () => {
   const [filters, setFilters] = useState<AdminTransactionFilters>({
@@ -34,6 +35,13 @@ export const useAdminAccounting = () => {
     isFetching: isAccountFetching,
     refetch: refetchAccountOverview,
   } = useGetAccountBalanceOverviewQuery(undefined, {});
+
+  // NEW: fetch net-profit directly (keeps same name)
+  const {
+    data: netProfitData,
+    isLoading: isNetProfitLoading,
+    refetch: refetchNetProfit,
+  } = useGetNetProfitQuery(undefined);
 
   // ROI details
   const {
@@ -57,7 +65,10 @@ export const useAdminAccounting = () => {
 
   // Map API response to AdminAccount
   const account: AdminAccount = useMemo(() => {
-    if (!accountOverviewData) {
+    if (
+      !accountOverviewData &&
+      (netProfitData === undefined || netProfitData === null)
+    ) {
       return {
         netProfitAvailable: 0,
         principalBalance: 0,
@@ -68,18 +79,25 @@ export const useAdminAccounting = () => {
       };
     }
 
-    const netProfit = Number(accountOverviewData.netProfit || 0);
-    const principal = Number(accountOverviewData.principalBalance || 0);
+    // prefer netProfitData (from new endpoint) if present, otherwise fallback to accountOverviewData.netProfit
+    const netProfitFromApi =
+      netProfitData !== undefined && netProfitData !== null
+        ? Number(netProfitData)
+        : Number(accountOverviewData?.netProfit ?? 0);
+
+    const netProfit = Number.isFinite(netProfitFromApi) ? netProfitFromApi : 0;
+
+    const principal = Number(accountOverviewData?.principalBalance ?? 0);
     const currentPrincipalWithdrawn = Number(
-      accountOverviewData.currentPrincipalWithdrawn ?? 0
+      accountOverviewData?.currentPrincipalWithdrawn ?? 0
     );
     const totalWithdrawnPrincipal = Number(
-      accountOverviewData.principalTotalWithdrawn ??
-        accountOverviewData.principalTotalWithdrawn ??
+      accountOverviewData?.principalTotalWithdrawn ??
+        accountOverviewData?.principalTotalWithdrawn ??
         0
     );
     const totalWithdrawnNetProfit = Number(
-      accountOverviewData.netProfitTotalWithdrawn || 0
+      accountOverviewData?.netProfitTotalWithdrawn ?? 0
     );
 
     return {
@@ -90,7 +108,7 @@ export const useAdminAccounting = () => {
       totalWithdrawnPrincipal,
       lastUpdated: new Date().toISOString(),
     };
-  }, [accountOverviewData]);
+  }, [accountOverviewData, netProfitData]);
 
   // Seed manual inputs from ROI details
   useEffect(() => {
@@ -208,7 +226,7 @@ export const useAdminAccounting = () => {
   /**
    * addWithdrawal
    * - principal: call withdrawPrincipal API and then refetch server history and balances (no optimistic local insert)
-   * - net_profit: local-only (no server endpoint) — but will NOT be included in the transactions list shown to UI because UI uses server history only
+   * - net_profit: call withdrawPrincipal API with withdrawFrom: "NET_PROFIT"
    */
   const addWithdrawal = useCallback(
     async (
@@ -222,34 +240,55 @@ export const useAdminAccounting = () => {
       // Create an id for the caller if they need it, but we won't persist locally for UI listing
       const tempId = Date.now().toString();
 
-      if (type === "principal") {
-        const payload = {
-          withdrawFrom: "PRINCIPAL_BALANCE" as const,
-          amount,
-          purpose,
-          notes,
-          txId: tronScanLink,
-          file:
-            proofScreenshot && typeof proofScreenshot !== "string"
-              ? proofScreenshot
-              : undefined,
-        };
+      const payloadBase: any = {
+        withdrawFrom: type === "principal" ? "PRINCIPAL_BALANCE" : "NET_PROFIT",
+        amount,
+        purpose,
+        notes,
+      };
 
+      if (tronScanLink) payloadBase.txId = tronScanLink;
+      if (proofScreenshot && typeof proofScreenshot !== "string")
+        payloadBase.file = proofScreenshot;
+
+      try {
+        // call withdrawPrincipalApi for both principal and net_profit (API expects withdrawFrom)
+        const res = await withdrawPrincipalApi(payloadBase as any).unwrap?.();
+
+        // On success, refresh authoritative data
         try {
-          await withdrawPrincipalApi(payload as any).unwrap?.();
-          // refresh authoritative data
           refetchWithdrawHistory();
           refetchAccountOverview();
-          return tempId;
-        } catch (err) {
-          throw err;
-        }
-      }
+          // also refresh netProfit from its dedicated endpoint if present
+          try {
+            refetchNetProfit();
+          } catch {}
+        } catch {}
 
-      // NET_PROFIT: no server endpoint; do not add to displayed transactions (since we show serverHistory only)
-      return tempId;
+        // Optionally inspect response if API signals failure in payload (e.g., success=false)
+        if (
+          res &&
+          typeof res === "object" &&
+          "success" in res &&
+          res.success === false
+        ) {
+          // If API returned explicit failure object, throw with message if present
+          const message = (res as any).message ?? "Withdraw failed";
+          throw new Error(message);
+        }
+
+        return tempId;
+      } catch (err: any) {
+        // Forward error to caller so UI can show proper toast
+        throw err;
+      }
     },
-    [withdrawPrincipalApi, refetchWithdrawHistory, refetchAccountOverview]
+    [
+      withdrawPrincipalApi,
+      refetchWithdrawHistory,
+      refetchAccountOverview,
+      refetchNetProfit,
+    ]
   );
 
   // REPLENISH PRINCIPAL
@@ -276,12 +315,21 @@ export const useAdminAccounting = () => {
         // refresh authoritative data
         refetchWithdrawHistory();
         refetchAccountOverview();
+        // refresh net profit value as well
+        try {
+          refetchNetProfit();
+        } catch {}
         return { success: true };
       } catch (err) {
         throw err;
       }
     },
-    [replenishPrincipalApi, refetchWithdrawHistory, refetchAccountOverview]
+    [
+      replenishPrincipalApi,
+      refetchWithdrawHistory,
+      refetchAccountOverview,
+      refetchNetProfit,
+    ]
   );
 
   // Manual inputs update
@@ -295,7 +343,11 @@ export const useAdminAccounting = () => {
 
   const recalculateNetProfit = useCallback(() => {
     refetchAccountOverview();
-  }, [refetchAccountOverview]);
+    // also refresh net-profit endpoint
+    try {
+      refetchNetProfit();
+    } catch {}
+  }, [refetchAccountOverview, refetchNetProfit]);
 
   const updateFilters = useCallback(
     (newFilters: Partial<AdminTransactionFilters>) => {
@@ -323,8 +375,10 @@ export const useAdminAccounting = () => {
     isReplenishLoading,
     isWithdrawPrincipalLoading,
     isWithdrawHistoryLoading,
+    isNetProfitLoading,
     refetchAccountOverview,
     refetchRoi,
     refetchWithdrawHistory,
+    refetchNetProfit,
   };
 };

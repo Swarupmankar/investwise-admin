@@ -1,3 +1,4 @@
+// src/pages/index.tsx
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { DashboardCard } from "@/components/dashboard/DashboardCard";
 import { BalanceEntryForm } from "@/components/dashboard/BalanceEntryForm";
@@ -25,6 +26,7 @@ const Index = () => {
   const {
     stats,
     balances,
+    netProfit, // <-- new field from the server
     creating,
     createCurrentBalance,
     refetchStats,
@@ -88,7 +90,14 @@ const Index = () => {
     : Number(stats?.principalBalance ?? 0);
 
   const afterOutflow = delta - monthlyOutflowTotal;
-  const currentPnL = afterOutflow - Number(stats?.principalWithdrawn ?? 0);
+  const localCurrentPnL = afterOutflow - Number(stats?.principalWithdrawn ?? 0);
+
+  // prefer server netProfit when available (netProfit is a number parsed in the hook),
+  // otherwise fall back to the local calculation (localCurrentPnL)
+  const currentPnL =
+    typeof netProfit === "number" && !Number.isNaN(netProfit)
+      ? netProfit
+      : localCurrentPnL;
 
   const getPnLColor = () =>
     currentPnL > 0 ? "success" : currentPnL < 0 ? "destructive" : "default";

@@ -38,6 +38,15 @@ export const dashboardApi = baseApi.injectEndpoints({
       keepUnusedDataFor: 60,
     }),
 
+    getNetProfit: build.query<string, void>({
+      query: () => ({
+        url: ENDPOINTS.DASHBOARD.NET_PROFIT,
+        method: "GET",
+      }),
+      providesTags: [{ type: "Dashboard", id: "NET_PROFIT" }],
+      keepUnusedDataFor: 60,
+    }),
+
     // POST create current-balance
     createCurrentBalance: build.mutation<any, CreateCurrentBalancePayload>({
       query: (payload) => ({
@@ -58,4 +67,5 @@ export const {
   useGetDashboardStatsQuery,
   useGetCurrentBalancesQuery,
   useCreateCurrentBalanceMutation,
+  useGetNetProfitQuery,
 } = dashboardApi;
