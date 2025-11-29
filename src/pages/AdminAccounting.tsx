@@ -8,7 +8,6 @@ import { AdminAccountingFilters } from "@/components/adminAccounting/AdminAccoun
 import { ManualControlsPanel } from "@/components/adminAccounting/ManualControlsPanel";
 import { useAdminAccountingContext } from "@/context/AdminAccountingContext";
 import { Separator } from "@/components/ui/separator";
-import { toast } from "sonner";
 
 const AdminAccounting = () => {
   const {
@@ -31,7 +30,6 @@ const AdminAccounting = () => {
 
   const handleWithdrawClick = (type: "net_profit" | "principal") => {
     setWithdrawFormType(type);
-    // Scroll to form
     document
       .getElementById("withdraw-form")
       ?.scrollIntoView({ behavior: "smooth" });
@@ -51,26 +49,16 @@ const AdminAccounting = () => {
     proofScreenshot?: string,
     tronScanLink?: string
   ) => {
-    try {
-      await addWithdrawal(
-        type,
-        amount,
-        purpose,
-        notes,
-        proofScreenshot,
-        tronScanLink
-      );
+    await addWithdrawal(
+      type,
+      amount,
+      purpose,
+      notes,
+      proofScreenshot,
+      tronScanLink
+    );
 
-      setWithdrawFormType(null);
-    } catch (err: any) {
-      // clear any existing toasts (prevents duplicates from other components)
-      toast.dismiss();
-
-      // Show proper error toast. Prefer server message if present.
-      const message =
-        err?.message || (typeof err === "string" ? err : "Failed to withdraw");
-      toast.error(message);
-    }
+    setWithdrawFormType(null);
   };
 
   return (
@@ -124,6 +112,7 @@ const AdminAccounting = () => {
         </section>
 
         <Separator />
+
         {/* Section 3: Filters and Stats */}
         <section>
           <h2 className="text-xl font-semibold mb-4">Transaction Overview</h2>

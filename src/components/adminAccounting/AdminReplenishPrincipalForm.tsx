@@ -56,7 +56,6 @@ export const AdminReplenishPrincipalForm = ({
 
   const watchedAmount = form.watch("amount");
 
-  // FIX: use absolute value so both "-165" and "165" behave the same.
   const availableToReplenish = Math.max(
     Math.abs(Number(account.currentPrincipalWithdrawn ?? 0)),
     0

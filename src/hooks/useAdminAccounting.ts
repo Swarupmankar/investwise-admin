@@ -279,7 +279,6 @@ export const useAdminAccounting = () => {
 
         return tempId;
       } catch (err: any) {
-        // Forward error to caller so UI can show proper toast
         throw err;
       }
     },

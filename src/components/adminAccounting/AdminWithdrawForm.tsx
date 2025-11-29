@@ -7,8 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { ArrowUpCircle, Upload, X } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
 import { AdminAccount } from "@/types/adminTransaction";
@@ -27,17 +40,21 @@ type WithdrawalFormData = z.infer<typeof withdrawalSchema>;
 interface AdminWithdrawFormProps {
   account: AdminAccount;
   onWithdraw: (
-    type: 'net_profit' | 'principal',
+    type: "net_profit" | "principal",
     amount: number,
     purpose: string,
     notes?: string,
     proofScreenshot?: string,
     tronScanLink?: string
-  ) => void;
-  defaultType?: 'net_profit' | 'principal';
+  ) => Promise<any>;
+  defaultType?: "net_profit" | "principal";
 }
 
-export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWithdrawFormProps) => {
+export const AdminWithdrawForm = ({
+  account,
+  onWithdraw,
+  defaultType,
+}: AdminWithdrawFormProps) => {
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -55,14 +72,15 @@ export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWit
 
   const watchedType = form.watch("type");
   const watchedAmount = form.watch("amount");
-  const availableBalance = watchedType === "net_profit" 
-    ? account.netProfitAvailable 
-    : account.principalBalance;
+  const availableBalance =
+    watchedType === "net_profit"
+      ? account.netProfitAvailable
+      : account.principalBalance;
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      if (file.size > 5 * 1024 * 1024) {
         toast({
           title: "File too large",
           description: "Please select a file smaller than 5MB",
@@ -70,8 +88,13 @@ export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWit
         });
         return;
       }
-      
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+
+      const allowedTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "application/pdf",
+      ];
       if (!allowedTypes.includes(file.type)) {
         toast({
           title: "Invalid file type",
@@ -80,7 +103,7 @@ export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWit
         });
         return;
       }
-      
+
       setProofFile(file);
     }
   };
@@ -91,7 +114,7 @@ export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWit
 
   const onSubmit = async (data: WithdrawalFormData) => {
     const amount = parseFloat(data.amount);
-    
+
     if (amount <= 0) {
       toast({
         title: "Invalid amount",
@@ -113,10 +136,11 @@ export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWit
     setIsSubmitting(true);
 
     try {
-      // In a real app, upload the file first
-      const proofScreenshot = proofFile ? `/uploads/proof-${Date.now()}.${proofFile.name.split('.').pop()}` : undefined;
-      
-      onWithdraw(
+      const proofScreenshot = proofFile
+        ? `/uploads/proof-${Date.now()}.${proofFile.name.split(".").pop()}`
+        : undefined;
+
+      await onWithdraw(
         data.type,
         amount,
         data.purpose,
@@ -127,15 +151,29 @@ export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWit
 
       toast({
         title: "Withdrawal logged successfully",
-        description: `${formatCurrency(amount)} withdrawn from ${data.type === 'net_profit' ? 'Net Profit' : 'Principal'}`,
+        description: `${formatCurrency(amount)} withdrawn from ${
+          data.type === "net_profit" ? "Net Profit" : "Principal"
+        }`,
       });
 
-      form.reset();
+      form.reset({
+        type: defaultType || "net_profit",
+        amount: "",
+        purpose: "",
+        notes: "",
+        tronScanLink: "",
+      });
       setProofFile(null);
-    } catch (error) {
+    } catch (error: any) {
+      const message =
+        error?.message ||
+        (typeof error === "string"
+          ? error
+          : "Failed to log withdrawal. Please try again.");
+
       toast({
         title: "Error",
-        description: "Failed to log withdrawal. Please try again.",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -161,7 +199,10 @@ export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWit
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Withdrawal Source</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select source" />
@@ -169,7 +210,8 @@ export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWit
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="net_profit">
-                          Net Profit ({formatCurrency(account.netProfitAvailable)})
+                          Net Profit (
+                          {formatCurrency(account.netProfitAvailable)})
                         </SelectItem>
                         <SelectItem value="principal">
                           Principal ({formatCurrency(account.principalBalance)})
@@ -188,13 +230,13 @@ export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWit
                   <FormItem>
                     <FormLabel>Amount (USDT)</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="0.00" 
-                        type="number" 
-                        step="0.01" 
+                      <Input
+                        placeholder="0.00"
+                        type="number"
+                        step="0.01"
                         min="0"
                         max={availableBalance}
-                        {...field} 
+                        {...field}
                       />
                     </FormControl>
                     <div className="text-sm text-muted-foreground">
@@ -213,7 +255,10 @@ export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWit
                 <FormItem>
                   <FormLabel>Purpose</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Business Development, Emergency Fund" {...field} />
+                    <Input
+                      placeholder="e.g., Business Development, Emergency Fund"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -227,7 +272,10 @@ export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWit
                 <FormItem>
                   <FormLabel>Notes (Optional)</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Additional details about this withdrawal..." {...field} />
+                    <Textarea
+                      placeholder="Additional details about this withdrawal..."
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -240,7 +288,9 @@ export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWit
                 <div className="mt-2">
                   {proofFile ? (
                     <div className="flex items-center gap-2 p-2 border rounded-md">
-                      <span className="text-sm truncate flex-1">{proofFile.name}</span>
+                      <span className="text-sm truncate flex-1">
+                        {proofFile.name}
+                      </span>
                       <Button
                         type="button"
                         variant="ghost"
@@ -278,7 +328,10 @@ export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWit
                   <FormItem>
                     <FormLabel>TronScan Link (Optional)</FormLabel>
                     <FormControl>
-                      <Input placeholder="https://tronscan.org/#/transaction/..." {...field} />
+                      <Input
+                        placeholder="https://tronscan.org/#/transaction/..."
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -292,21 +345,27 @@ export const AdminWithdrawForm = ({ account, onWithdraw, defaultType }: AdminWit
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-muted-foreground">Amount:</span>
-                    <span className="ml-2 font-medium">{formatCurrency(parseFloat(watchedAmount))}</span>
+                    <span className="ml-2 font-medium">
+                      {formatCurrency(parseFloat(watchedAmount))}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Remaining Balance:</span>
+                    <span className="text-muted-foreground">
+                      Remaining Balance:
+                    </span>
                     <span className="ml-2 font-medium">
-                      {formatCurrency(availableBalance - parseFloat(watchedAmount))}
+                      {formatCurrency(
+                        availableBalance - parseFloat(watchedAmount)
+                      )}
                     </span>
                   </div>
                 </div>
               </div>
             )}
 
-            <Button 
-              type="submit" 
-              className="w-full" 
+            <Button
+              type="submit"
+              className="w-full"
               disabled={isSubmitting}
               size="lg"
             >
