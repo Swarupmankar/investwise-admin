@@ -144,15 +144,20 @@ export function useWithdrawalsData() {
       const list = type
         ? withdrawals.filter((x) => x.withdrawFrom === type)
         : withdrawals;
+
+      const pendingList = list.filter((x) => x.status === "pending");
+      const approvedList = list.filter((x) => x.status === "approved");
+      const rejectedList = list.filter((x) => x.status === "rejected");
+
       return {
         total: list.length,
-        pending: list.filter((x) => x.status === "pending").length,
-        approved: list.filter((x) => x.status === "approved").length,
-        rejected: list.filter((x) => x.status === "rejected").length,
+        pending: pendingList.length,
+        approved: approvedList.length,
+        rejected: rejectedList.length,
         totalAmount: list.reduce((s, i) => s + i.amount, 0),
-        pendingAmount: list
-          .filter((x) => x.status === "pending")
-          .reduce((s, i) => s + i.amount, 0),
+        pendingAmount: pendingList.reduce((s, i) => s + i.amount, 0),
+        approvedAmount: approvedList.reduce((s, i) => s + i.amount, 0),
+        rejectedAmount: rejectedList.reduce((s, i) => s + i.amount, 0),
       };
     },
     [withdrawals]

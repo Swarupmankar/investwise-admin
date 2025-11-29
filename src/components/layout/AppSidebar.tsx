@@ -9,7 +9,6 @@ import {
   LifeBuoy,
   Wallet,
   LogOut,
-  ArrowDown,
   ArrowDownRight,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
@@ -85,6 +84,7 @@ const authItems = [
     icon: LogOut,
   },
 ];
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
@@ -120,8 +120,10 @@ export function AppSidebar() {
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 ${
                           isActive
-                            ? "bg-primary text-primary-foreground shadow-glow"
-                            : "text-foreground hover:bg-accent hover:text-accent-foreground"
+                            ? // ACTIVE STATE
+                              "bg-sidebar-accent text-sidebar-accent-foreground shadow-glow"
+                            : // INACTIVE + HOVER STATE
+                              "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         }`
                       }
                     >
@@ -152,7 +154,8 @@ export function AppSidebar() {
                         `flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 ${
                           isActive
                             ? "bg-destructive text-destructive-foreground"
-                            : "text-foreground hover:bg-accent hover:text-accent-foreground"
+                            : // use sidebar tokens here as well
+                              "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         }`
                       }
                     >

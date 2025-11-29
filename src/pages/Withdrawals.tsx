@@ -125,7 +125,7 @@ export default function Withdrawals() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {formatCurrency(totalStats.totalAmount)}
+                {formatCurrency(totalStats.approvedAmount ?? 0)}
               </div>
               <p className="text-xs text-muted-foreground">
                 {formatCurrency(totalStats.pendingAmount ?? 0)} pending
