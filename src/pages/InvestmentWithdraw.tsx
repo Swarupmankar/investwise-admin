@@ -85,14 +85,21 @@ export default function InvestmentWithdraw() {
     return res;
   }, [allRequests, filters]);
 
-  const stats = useMemo(
-    () => ({
+  const stats = useMemo(() => {
+    const approvedRequests = allRequests.filter((r) => r.status === "approved");
+
+    const approvedAmount = approvedRequests.reduce(
+      (sum, r) => sum + (Number(r.amount) || 0),
+      0
+    );
+
+    return {
       total: allRequests.length,
       pending: allRequests.filter((r) => r.status === "pending").length,
-      approved: allRequests.filter((r) => r.status === "approved").length,
-    }),
-    [allRequests]
-  );
+      approved: approvedRequests.length,
+      approvedAmount,
+    };
+  }, [allRequests]);
 
   const handleReview = (req: InvestmentWithdrawRequest) => {
     setSelectedRequest(req);

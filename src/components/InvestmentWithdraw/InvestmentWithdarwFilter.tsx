@@ -22,6 +22,7 @@ interface InvestmentWithdrawFiltersProps {
     total?: number;
     pending?: number;
     approved?: number;
+    approvedAmount?: number;
   };
 }
 
@@ -39,10 +40,22 @@ export function InvestmentWithdrawFilters({
   const currentSortOrder: InvestmentWithdrawSortOrder =
     filters.sortOrder ?? "newest";
 
+  const approvedAmount =
+    typeof stats.approvedAmount === "number" ? stats.approvedAmount : 0;
+
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-green-500">
+              ${approvedAmount.toLocaleString()}
+            </div>
+            <div className="text-sm text-muted-foreground">Amount</div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{stats.total ?? 0}</div>
