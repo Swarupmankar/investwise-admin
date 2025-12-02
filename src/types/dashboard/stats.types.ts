@@ -9,6 +9,8 @@ export interface DashboardStatsRaw {
   totalPrincipalWithdrawn: string;
   clientsCount: number;
   investmentsCount: number;
+  carryOnOutflowReferral: string;
+  carryOnOutflowRoi: string;
 }
 
 export interface CurrentBalanceRaw {

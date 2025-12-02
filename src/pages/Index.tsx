@@ -43,6 +43,8 @@ const Index = () => {
   const monthlyRoi = stats?.thisMonthRoi ?? 0;
   const monthlyReferral = stats?.thisMonthRefEarnings ?? 0;
   const monthlyPrincipalWithdrawn = stats?.thisMonthPrincipalWithdrawn ?? 0;
+  const carryOnOutflowRoi = stats?.carryOnOutflowRoi ?? 0;
+  const carryOnOutflowReferral = stats?.carryOnOutflowReferral ?? 0;
 
   const withinSameMonth = (d: Date, reference: Date) =>
     d.getUTCFullYear() === reference.getUTCFullYear() &&
@@ -71,13 +73,12 @@ const Index = () => {
     return lastAmt - firstAmt;
   };
 
-  const monthlyOutflowRoi = monthlyRoi;
-  const monthlyOutflowReferral = monthlyReferral;
+  const monthlyOutflowRoi = monthlyRoi + carryOnOutflowRoi;
+  const monthlyOutflowReferral = monthlyReferral + carryOnOutflowReferral;
   const monthlyOutflowPrincipal = monthlyPrincipalWithdrawn;
+
   const monthlyOutflowTotal =
-    Number(stats?.thisMonthRoi ?? 0) +
-    Number(stats?.thisMonthRefEarnings ?? 0) +
-    Number(stats?.thisMonthPrincipalWithdrawn ?? 0);
+    monthlyOutflowRoi + monthlyOutflowReferral + monthlyOutflowPrincipal;
 
   const totalWithdrawn =
     Number(stats?.totalProfitWithdrawn ?? 0) +

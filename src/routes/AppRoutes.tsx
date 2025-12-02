@@ -22,6 +22,7 @@ import PaymentSettings from "@/pages/PaymentSettings";
 import Logout from "@/pages/auth/Logout";
 import Support from "@/pages/Support";
 import InvestmentWithdraw from "@/pages/InvestmentWithdraw";
+import Investments from "@/pages/Investments";
 
 const AppRoutes: React.FC = () => {
   return (
@@ -37,6 +38,7 @@ const AppRoutes: React.FC = () => {
         <Route path="/clients" element={<Clients />} />
         <Route path="/clients/:id" element={<ClientProfile />} />
         <Route path="/deposits" element={<Deposits />} />
+        <Route path="/investments" element={<Investments />} />
         <Route path="/withdrawals" element={<Withdrawals />} />
         <Route
           path="/investment-withdrawals"

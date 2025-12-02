@@ -10,6 +10,7 @@ import {
   Wallet,
   LogOut,
   ArrowDownRight,
+  TrendingUp,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
@@ -34,6 +35,11 @@ const navigationItems = [
     title: "Clients",
     url: "/clients",
     icon: Users,
+  },
+  {
+    title: "Investments",
+    url: "/investments",
+    icon: TrendingUp,
   },
   {
     title: "Deposits",

@@ -31,22 +31,33 @@ export const ClientStatusBadge = ({
           variant: "default" as const,
           className: "bg-success text-success-foreground",
         };
+
       case "pending":
         return {
           variant: "secondary" as const,
           className: "bg-warning text-warning-foreground",
         };
-      case "rejected":
+
+      case "paused":
+        return {
+          variant: "secondary" as const,
+          className:
+            "bg-warning text-warning-foreground hover:bg-warning hover:text-warning-foreground",
+        };
+
       case "archived":
+      case "completed":
         return {
           variant: "destructive" as const,
           className: "bg-destructive text-destructive-foreground",
         };
+
       case "not submitted":
         return {
           variant: "outline" as const,
           className: "text-muted-foreground",
         };
+
       default:
         return {
           variant: "outline" as const,
@@ -56,7 +67,12 @@ export const ClientStatusBadge = ({
   };
 
   const config = getStatusConfig();
-  const displayLabel = toTitleCase(status.replace(/_/g, " ").trim());
+
+  // ✅ display label fix
+  const displayLabel =
+    norm === "archived" || norm === "completed"
+      ? "Closed"
+      : toTitleCase(status.replace(/_/g, " ").trim());
 
   return (
     <Badge variant={variant || config.variant} className={cn(config.className)}>

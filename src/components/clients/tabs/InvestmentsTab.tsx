@@ -38,8 +38,6 @@ const toNumber = (v?: string | number | null) => {
 };
 const norm = (v?: unknown) =>
   v === null || v === undefined ? "" : String(v).toLowerCase();
-const capitalize = (s?: string) =>
-  !s ? "" : String(s).charAt(0).toUpperCase() + String(s).slice(1);
 const firstOfNextMonth = (d: Date) =>
   new Date(d.getFullYear(), d.getMonth() + 1, 1);
 const daysInMonth = (d: Date) =>
@@ -565,20 +563,23 @@ export function InvestmentsTab({
                 <TableRow>
                   <TableHead className="w-[110px]">Investment ID</TableHead>
                   <TableHead className="w-[260px]">Name</TableHead>
-                  <TableHead className="w-[140px] text-right">Amount</TableHead>
+                  <TableHead className="w-[140px] text-center">Amount</TableHead>
                   <TableHead className="w-[150px]">Start Date</TableHead>
                   <TableHead className="w-[110px]">Status</TableHead>
-                  <TableHead className="w-[140px] text-right">
+                  <TableHead className="w-[140px] text-center">
                     Days Active (Mo)
                   </TableHead>
-                  <TableHead className="w-[160px] text-right">
+                  <TableHead className="w-[160px] text-center">
                     Pro-rated Due (Mo)
                   </TableHead>
-                  <TableHead className="w-[140px] text-right">
+                  <TableHead className="w-[160px] text-center">
+                    This Month Returns
+                  </TableHead>
+                  <TableHead className="w-[140px] text-center">
                     Lifetime Return
                   </TableHead>
                   {monthYearSelected && (
-                    <TableHead className="w-[140px]">
+                    <TableHead className="w-[140px] text-center">
                       Return (Selected Mo)
                     </TableHead>
                   )}
@@ -614,7 +615,7 @@ export function InvestmentsTab({
                         <div className="truncate">{i.name ?? "-"}</div>
                       </TableCell>
 
-                      <TableCell className="text-right whitespace-nowrap">
+                      <TableCell className="text-center whitespace-nowrap">
                         {formatCurrency(toNumber(i.amount))}
                       </TableCell>
 
@@ -630,20 +631,24 @@ export function InvestmentsTab({
                         </span>
                       </TableCell>
 
-                      <TableCell className="text-right whitespace-nowrap">
+                      <TableCell className="text-center whitespace-nowrap">
                         {daysActiveThisMonth(i.createdAt)}
                       </TableCell>
 
-                      <TableCell className="text-right whitespace-nowrap">
+                      <TableCell className="text-center whitespace-nowrap">
                         {formatCurrency(proratedReturn(i))}
                       </TableCell>
 
-                      <TableCell className="text-right whitespace-nowrap">
+                      <TableCell className="text-center whitespace-nowrap">
+                        {formatCurrency(toNumber(i.thisMonthsReturns))}
+                      </TableCell>
+
+                      <TableCell className="text-center whitespace-nowrap">
                         {formatCurrency(toNumber(i.returnsBalance))}
                       </TableCell>
 
                       {monthYearSelected && (
-                        <TableCell className="text-right whitespace-nowrap">
+                        <TableCell className="text-center whitespace-nowrap">
                           {selectedReturnAmount !== undefined
                             ? formatCurrency(toNumber(selectedReturnAmount))
                             : "-"}

@@ -70,8 +70,7 @@ export const ClientOverviewGrid = ({
   const totalWithdrawn = toNumber(client.totalWithdrawals ?? 0);
 
   const totalReturnEarned = (investments || []).reduce(
-    (sum, inv) =>
-      sum + toNumber(inv.returnsBalance) + toNumber(inv.thisMonthsReturns),
+    (sum, inv) => sum + toNumber(inv.returnsBalance),
     0
   );
 

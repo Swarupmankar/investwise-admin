@@ -63,6 +63,8 @@ export function useFinancialData() {
       totalPrincipalWithdrawn: parseNum(statsRaw.totalPrincipalWithdrawn),
       clientsCount: statsRaw.clientsCount,
       investmentsCount: statsRaw.investmentsCount,
+      carryOnOutflowReferral: parseNum(statsRaw.carryOnOutflowReferral),
+      carryOnOutflowRoi: parseNum(statsRaw.carryOnOutflowRoi),
     };
   }, [statsRaw]);
 
@@ -114,7 +116,11 @@ export function useFinancialData() {
     stats,
     balances,
     netProfit,
-    raw: { stats: statsRaw ?? null, balances: balancesRaw ?? null, netProfit: netProfitRaw ?? null },
+    raw: {
+      stats: statsRaw ?? null,
+      balances: balancesRaw ?? null,
+      netProfit: netProfitRaw ?? null,
+    },
     isLoading,
     isFetching,
     creating,

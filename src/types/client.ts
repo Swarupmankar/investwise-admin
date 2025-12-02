@@ -38,6 +38,7 @@ export interface Investment {
   nickname?: string;
   clientId: string;
   amount: number;
+  planType: "monthly" | "quarterly";
   startDate: string;
   status: "active" | "completed" | "paused";
   returnCredited: number;
@@ -111,4 +112,23 @@ export interface PauseResumeResponse {
 
 export type PauseResumeRequest = {
   id: string | number;
+};
+
+export type AdminInvestmentApiItem = {
+  clientName: string;
+  planType: "ReferralThreeMonths" | "ReferralOnePercent" | null;
+  amount: string;
+  createdAt: string;
+  investmentStatus: "ACTIVE" | "COMPLETED" | "PAUSED";
+  currentMonthReturns: string;
+  lifetimeReturns: string;
+  referredBy: string | null;
+};
+
+export type AdminInvestmentWithDetails = Investment & {
+  clientName: string;
+  referredBy: string | null;
+  currentMonthReturns: number;
+  lifetimeReturns: number;
+  rawPlanType?: AdminInvestmentApiItem["planType"];
 };
