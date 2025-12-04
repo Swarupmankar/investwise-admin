@@ -73,6 +73,7 @@ export const ENDPOINTS = {
     ROI_DETAILS: "/admin/accounting/roi-details",
     WITHDRAW_PRINCIPAL: "/admin/accounting/withdraw-principal",
     WITHDRAW_HISTORY: "/admin/accounting/withdraw-history",
+    MOVE_TO_NET_PROFIT: "/admin/dashboard/move-to-net-profit",
   },
 
   INVESTMENTS: {

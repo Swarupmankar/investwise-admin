@@ -5,6 +5,7 @@ export interface AdminAccount {
   totalWithdrawnNetProfit: number;
   totalWithdrawnPrincipal: number;
   lastUpdated: string;
+  currentPnl: number;
 }
 
 export interface AdminTransaction {

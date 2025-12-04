@@ -94,6 +94,13 @@ export const accountingApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: [{ type: "Accounting" as const, id: "ROI" }],
     }),
+
+    moveToNetProfit: build.mutation<any, void>({
+      query: () => ({
+        url: ENDPOINTS.ACCOUNTING.MOVE_TO_NET_PROFIT,
+        method: "GET",
+      }),
+    }),
   }),
   overrideExisting: false,
 });
@@ -105,4 +112,5 @@ export const {
   useGetWithdrawHistoryQuery,
   useGetRoiDetailsQuery,
   useUpdateRoiDetailsMutation,
+  useMoveToNetProfitMutation,
 } = accountingApi;

@@ -26,7 +26,7 @@ const Index = () => {
   const {
     stats,
     balances,
-    netProfit, // <-- new field from the server
+    currentPnl,
     creating,
     createCurrentBalance,
     refetchStats,
@@ -91,14 +91,8 @@ const Index = () => {
     : Number(stats?.principalBalance ?? 0);
 
   const afterOutflow = delta - monthlyOutflowTotal;
-  const localCurrentPnL = afterOutflow - Number(stats?.principalWithdrawn ?? 0);
 
-  // prefer server netProfit when available (netProfit is a number parsed in the hook),
-  // otherwise fall back to the local calculation (localCurrentPnL)
-  const currentPnL =
-    typeof netProfit === "number" && !Number.isNaN(netProfit)
-      ? netProfit
-      : localCurrentPnL;
+  const currentPnL = currentPnl;
 
   const getPnLColor = () =>
     currentPnL > 0 ? "success" : currentPnL < 0 ? "destructive" : "default";

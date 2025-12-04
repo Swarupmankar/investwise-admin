@@ -37,3 +37,8 @@ export interface CreateCurrentBalancePayload {
   amount: number;
   notes?: string;
 }
+
+export interface NetProfitResponse {
+  currentPnl: string;
+  netProfit: string;
+}

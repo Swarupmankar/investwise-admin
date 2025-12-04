@@ -1,4 +1,3 @@
-// src/hooks/useFinancialData.ts
 import { useCallback, useMemo } from "react";
 import {
   useGetDashboardStatsQuery,
@@ -11,6 +10,7 @@ import {
   CurrentBalance,
   CurrentBalanceRaw,
   DashboardStatsRaw,
+  NetProfitResponse,
 } from "@/types/dashboard/stats.types";
 
 export function useFinancialData() {
@@ -30,12 +30,14 @@ export function useFinancialData() {
     refetch: refetchBalances,
   } = useGetCurrentBalancesQuery();
 
-  // NEW: net profit query
   const {
-    data: netProfitRaw,
-    error: netProfitError,
-    isLoading: netProfitLoading,
-    refetch: refetchNetProfit,
+    data: currentPnlRaw = {
+      currentPnl: "0",
+      netProfit: "0",
+    } as NetProfitResponse,
+    error: currentPnlError,
+    isLoading: currentPnlLoading,
+    refetch: refetchCurrentPnl,
   } = useGetNetProfitQuery();
 
   const [createMutation, { isLoading: creating }] =
@@ -88,12 +90,14 @@ export function useFinancialData() {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [balancesRaw]);
 
-  // parsed net profit (from new endpoint)
-  const netProfit = useMemo(() => parseNum(netProfitRaw, 0), [netProfitRaw]);
+  const currentPnl = useMemo(
+    () => parseNum(currentPnlRaw.currentPnl),
+    [currentPnlRaw]
+  );
 
-  const isLoading = statsLoading || balancesLoading || netProfitLoading;
+  const isLoading = statsLoading || balancesLoading || currentPnlLoading;
   const isFetching = statsFetching || balancesFetching;
-  const error = statsError ?? balancesError ?? netProfitError ?? null;
+  const error = statsError ?? balancesError ?? currentPnlError ?? null;
 
   const createCurrentBalance = useCallback(
     async (payload: CreateCurrentBalancePayload) => {
@@ -102,24 +106,24 @@ export function useFinancialData() {
         try {
           refetchBalances();
           refetchStats();
-          refetchNetProfit();
+          refetchCurrentPnl();
         } catch {}
         return { success: true, data: res };
       } catch (err: any) {
         return { success: false, error: err };
       }
     },
-    [createMutation, refetchBalances, refetchStats, refetchNetProfit]
+    [createMutation, refetchBalances, refetchStats, refetchCurrentPnl]
   );
 
   return {
     stats,
     balances,
-    netProfit,
+    currentPnl,
     raw: {
       stats: statsRaw ?? null,
       balances: balancesRaw ?? null,
-      netProfit: netProfitRaw ?? null,
+      currentPnl: currentPnlRaw ?? null,
     },
     isLoading,
     isFetching,
@@ -128,6 +132,6 @@ export function useFinancialData() {
     createCurrentBalance,
     refetchStats,
     refetchBalances,
-    refetchNetProfit,
+    refetchCurrentPnl,
   } as const;
 }

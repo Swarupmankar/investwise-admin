@@ -22,6 +22,8 @@ const AdminAccounting = () => {
     recalculateNetProfit,
     updateFilters,
     clearFilters,
+    movePnLToNetProfit, // ⬅️ NEW
+    // isMoveToNetProfitLoading,  // ⬅️ available if you want to show spinner
   } = useAdminAccountingContext();
 
   const [withdrawFormType, setWithdrawFormType] = useState<
@@ -83,6 +85,8 @@ const AdminAccounting = () => {
             account={account}
             onWithdrawClick={handleWithdrawClick}
             onReplenishClick={handleReplenishClick}
+            currentPnL={account.currentPnl} // ⬅️ from API
+            onMovePnLClick={movePnLToNetProfit} // ⬅️ calls /move-to-net-profit
           />
         </section>
 

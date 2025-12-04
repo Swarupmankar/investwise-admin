@@ -5,6 +5,7 @@ import {
   CreateCurrentBalancePayload,
   CurrentBalanceRaw,
   DashboardStatsRaw,
+  NetProfitResponse,
 } from "@/types/dashboard/stats.types";
 
 export const dashboardApi = baseApi.injectEndpoints({
@@ -38,12 +39,13 @@ export const dashboardApi = baseApi.injectEndpoints({
       keepUnusedDataFor: 60,
     }),
 
-    getNetProfit: build.query<string, void>({
+    //Net Profit
+    getNetProfit: build.query<NetProfitResponse, void>({
       query: () => ({
         url: ENDPOINTS.DASHBOARD.NET_PROFIT,
         method: "GET",
       }),
-      providesTags: [{ type: "Dashboard", id: "NET_PROFIT" }],
+      providesTags: [{ type: "Dashboard", id: "currentPnl" }],
       keepUnusedDataFor: 60,
     }),
 
@@ -56,7 +58,7 @@ export const dashboardApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: [
         { type: "Dashboard", id: "CURRENT_BALANCES" },
-        { type: "Dashboard", id: "STATS" }, // new balance could affect dashboard stats
+        { type: "Dashboard", id: "STATS" },
       ],
     }),
   }),
