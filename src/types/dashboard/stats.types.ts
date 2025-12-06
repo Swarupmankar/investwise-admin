@@ -1,14 +1,16 @@
-// src/types/dashboard/stats.types.ts
 export interface DashboardStatsRaw {
   principalBalance: string;
   principalWithdrawn: string;
-  thisMonthRoi: string;
-  thisMonthRefEarnings: string;
-  thisMonthPrincipalWithdrawn: string;
   totalProfitWithdrawn: string;
   totalPrincipalWithdrawn: string;
   clientsCount: number;
   investmentsCount: number;
+}
+
+export interface OutflowStatsRaw {
+  projectedThisMonthRoi: string;
+  projectedThisMonthReferral: string;
+  thisMonthPrincipalWithdrawn: string;
   carryOnOutflowReferral: string;
   carryOnOutflowRoi: string;
 }

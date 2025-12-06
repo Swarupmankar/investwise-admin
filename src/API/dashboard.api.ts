@@ -1,4 +1,3 @@
-// src/API/dashboard.api.ts
 import { baseApi } from "./baseApi";
 import { ENDPOINTS } from "@/constants/apiEndpoints";
 import {
@@ -6,6 +5,7 @@ import {
   CurrentBalanceRaw,
   DashboardStatsRaw,
   NetProfitResponse,
+  OutflowStatsRaw,
 } from "@/types/dashboard/stats.types";
 
 export const dashboardApi = baseApi.injectEndpoints({
@@ -17,6 +17,16 @@ export const dashboardApi = baseApi.injectEndpoints({
         method: "GET",
       }),
       providesTags: [{ type: "Dashboard", id: "STATS" }],
+      keepUnusedDataFor: 60,
+    }),
+
+    // GET Outflow
+    getOutflowStats: build.query<OutflowStatsRaw, void>({
+      query: () => ({
+        url: ENDPOINTS.DASHBOARD.OUTFLOW,
+        method: "GET",
+      }),
+      providesTags: [{ type: "Dashboard", id: "OUTFLOW" }],
       keepUnusedDataFor: 60,
     }),
 
@@ -70,4 +80,5 @@ export const {
   useGetCurrentBalancesQuery,
   useCreateCurrentBalanceMutation,
   useGetNetProfitQuery,
+  useGetOutflowStatsQuery,
 } = dashboardApi;

@@ -65,6 +65,7 @@ export const ENDPOINTS = {
     STATS: "/admin/dashboard/stats",
     CURRENT_BALANCES: "/admin/dashboard/current-balances",
     NET_PROFIT: "/admin/dashboard/net-profit",
+    OUTFLOW: "/admin/dashboard/outflow",
   },
 
   ACCOUNTING: {

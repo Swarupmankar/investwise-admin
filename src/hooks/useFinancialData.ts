@@ -4,6 +4,7 @@ import {
   useGetCurrentBalancesQuery,
   useCreateCurrentBalanceMutation,
   useGetNetProfitQuery,
+  useGetOutflowStatsQuery,
 } from "@/API/dashboard.api";
 import {
   CreateCurrentBalancePayload,
@@ -11,6 +12,7 @@ import {
   CurrentBalanceRaw,
   DashboardStatsRaw,
   NetProfitResponse,
+  OutflowStatsRaw,
 } from "@/types/dashboard/stats.types";
 
 export function useFinancialData() {
@@ -21,6 +23,14 @@ export function useFinancialData() {
     isFetching: statsFetching,
     refetch: refetchStats,
   } = useGetDashboardStatsQuery();
+
+  const {
+    data: outflowRaw,
+    error: outflowError,
+    isLoading: outflowLoading,
+    isFetching: outflowFetching,
+    refetch: refetchOutflow,
+  } = useGetOutflowStatsQuery();
 
   const {
     data: balancesRaw,
@@ -48,7 +58,6 @@ export function useFinancialData() {
     return Number.isFinite(n) ? n : fallback;
   };
 
-  // === parsed stats ===
   const stats = useMemo(() => {
     if (!statsRaw) return null;
 
@@ -56,19 +65,29 @@ export function useFinancialData() {
       raw: statsRaw as DashboardStatsRaw,
       principalBalance: parseNum(statsRaw.principalBalance),
       principalWithdrawn: parseNum(statsRaw.principalWithdrawn),
-      thisMonthRoi: parseNum(statsRaw.thisMonthRoi),
-      thisMonthRefEarnings: parseNum(statsRaw.thisMonthRefEarnings),
-      thisMonthPrincipalWithdrawn: parseNum(
-        statsRaw.thisMonthPrincipalWithdrawn
-      ),
       totalProfitWithdrawn: parseNum(statsRaw.totalProfitWithdrawn),
       totalPrincipalWithdrawn: parseNum(statsRaw.totalPrincipalWithdrawn),
       clientsCount: statsRaw.clientsCount,
       investmentsCount: statsRaw.investmentsCount,
-      carryOnOutflowReferral: parseNum(statsRaw.carryOnOutflowReferral),
-      carryOnOutflowRoi: parseNum(statsRaw.carryOnOutflowRoi),
     };
   }, [statsRaw]);
+
+  const outflow = useMemo(() => {
+    if (!outflowRaw) return null;
+
+    return {
+      raw: outflowRaw as OutflowStatsRaw,
+      projectedThisMonthRoi: parseNum(outflowRaw.projectedThisMonthRoi),
+      projectedThisMonthReferral: parseNum(
+        outflowRaw.projectedThisMonthReferral
+      ),
+      thisMonthPrincipalWithdrawn: parseNum(
+        outflowRaw.thisMonthPrincipalWithdrawn
+      ),
+      carryOnOutflowReferral: parseNum(outflowRaw.carryOnOutflowReferral),
+      carryOnOutflowRoi: parseNum(outflowRaw.carryOnOutflowRoi),
+    };
+  }, [outflowRaw]);
 
   // === parsed balances ===
   const balances = useMemo(() => {
@@ -95,9 +114,11 @@ export function useFinancialData() {
     [currentPnlRaw]
   );
 
-  const isLoading = statsLoading || balancesLoading || currentPnlLoading;
-  const isFetching = statsFetching || balancesFetching;
-  const error = statsError ?? balancesError ?? currentPnlError ?? null;
+  const isLoading =
+    statsLoading || balancesLoading || currentPnlLoading || outflowLoading;
+  const isFetching = statsFetching || balancesFetching || outflowFetching;
+  const error =
+    statsError ?? balancesError ?? currentPnlError ?? outflowError ?? null;
 
   const createCurrentBalance = useCallback(
     async (payload: CreateCurrentBalancePayload) => {
@@ -107,21 +128,30 @@ export function useFinancialData() {
           refetchBalances();
           refetchStats();
           refetchCurrentPnl();
+          refetchOutflow();
         } catch {}
         return { success: true, data: res };
       } catch (err: any) {
         return { success: false, error: err };
       }
     },
-    [createMutation, refetchBalances, refetchStats, refetchCurrentPnl]
+    [
+      createMutation,
+      refetchBalances,
+      refetchStats,
+      refetchCurrentPnl,
+      refetchOutflow,
+    ]
   );
 
   return {
     stats,
+    outflow,
     balances,
     currentPnl,
     raw: {
       stats: statsRaw ?? null,
+      outflow: outflowRaw ?? null,
       balances: balancesRaw ?? null,
       currentPnl: currentPnlRaw ?? null,
     },
@@ -133,5 +163,6 @@ export function useFinancialData() {
     refetchStats,
     refetchBalances,
     refetchCurrentPnl,
+    refetchOutflow,
   } as const;
 }

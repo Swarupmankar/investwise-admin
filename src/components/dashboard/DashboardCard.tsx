@@ -10,12 +10,12 @@ interface DashboardCardProps {
   valueColor?: "default" | "success" | "destructive" | "warning";
 }
 
-export const DashboardCard = ({ 
-  title, 
-  children, 
-  icon, 
+export const DashboardCard = ({
+  title,
+  children,
+  icon,
   className,
-  valueColor = "default" 
+  valueColor = "default",
 }: DashboardCardProps) => {
   const getValueColorClasses = () => {
     switch (valueColor) {
@@ -31,19 +31,17 @@ export const DashboardCard = ({
   };
 
   return (
-    <Card className={cn(
-      "bg-gradient-card border-card-border shadow-card hover:shadow-elevated transition-all duration-300 hover:scale-105",
-      className
-    )}>
+    <Card
+      className={cn(
+        "bg-gradient-card border-card-border shadow-card hover:shadow-elevated transition-all duration-300 hover:scale-105",
+        className
+      )}
+    >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}
         </CardTitle>
-        {icon && (
-          <div className="text-muted-foreground">
-            {icon}
-          </div>
-        )}
+        {icon && <div className="text-muted-foreground">{icon}</div>}
       </CardHeader>
       <CardContent>
         <div className={cn("text-2xl font-bold", getValueColorClasses())}>

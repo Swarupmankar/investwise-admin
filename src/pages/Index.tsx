@@ -1,4 +1,3 @@
-// src/pages/index.tsx
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { DashboardCard } from "@/components/dashboard/DashboardCard";
 import { BalanceEntryForm } from "@/components/dashboard/BalanceEntryForm";
@@ -15,7 +14,6 @@ import {
   ArrowUpCircle,
 } from "lucide-react";
 
-// simplified type - only known fields
 type BalanceEntry = {
   amount?: number;
   delta?: number;
@@ -25,6 +23,7 @@ type BalanceEntry = {
 const Index = () => {
   const {
     stats,
+    outflow,
     balances,
     currentPnl,
     creating,
@@ -39,42 +38,15 @@ const Index = () => {
   const totalProfitWithdrawn = stats?.totalProfitWithdrawn ?? 0;
   const clientsCount = stats?.clientsCount ?? 0;
   const investmentsCount = stats?.investmentsCount ?? 0;
-
-  const monthlyRoi = stats?.thisMonthRoi ?? 0;
-  const monthlyReferral = stats?.thisMonthRefEarnings ?? 0;
-  const monthlyPrincipalWithdrawn = stats?.thisMonthPrincipalWithdrawn ?? 0;
-  const carryOnOutflowRoi = stats?.carryOnOutflowRoi ?? 0;
-  const carryOnOutflowReferral = stats?.carryOnOutflowReferral ?? 0;
-
-  const withinSameMonth = (d: Date, reference: Date) =>
-    d.getUTCFullYear() === reference.getUTCFullYear() &&
-    d.getUTCMonth() === reference.getUTCMonth();
-
-  const getDeltaFromTableMTD = (rows: BalanceEntry[] = []): number => {
-    if (!rows.length) return 0;
-    const today = new Date();
-
-    const monthRows = rows.filter((r) =>
-      r.createdAt ? withinSameMonth(r.createdAt, today) : true
-    );
-
-    const hasExplicitDelta = monthRows.some((r) => typeof r.delta === "number");
-    if (hasExplicitDelta) {
-      return monthRows.reduce((sum, r) => sum + (r.delta ?? 0), 0);
-    }
-
-    const sorted = monthRows.sort(
-      (a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0)
-    );
-
-    const firstAmt = sorted[0]?.amount ?? 0;
-    const lastAmt = sorted[sorted.length - 1]?.amount ?? firstAmt;
-
-    return lastAmt - firstAmt;
-  };
-
-  const monthlyOutflowRoi = monthlyRoi + carryOnOutflowRoi;
-  const monthlyOutflowReferral = monthlyReferral + carryOnOutflowReferral;
+  const projectedThisMonthRoi = outflow?.projectedThisMonthRoi ?? 0;
+  const projectedThisMonthReferral = outflow?.projectedThisMonthReferral ?? 0;
+  const monthlyPrincipalWithdrawn = outflow?.thisMonthPrincipalWithdrawn ?? 0;
+  const carryOnOutflowRoi = outflow?.carryOnOutflowRoi ?? 0;
+  const carryOnOutflowReferral = outflow?.carryOnOutflowReferral ?? 0;
+  //sum up outflow components
+  const monthlyOutflowRoi = projectedThisMonthRoi + carryOnOutflowRoi;
+  const monthlyOutflowReferral =
+    projectedThisMonthReferral + carryOnOutflowReferral;
   const monthlyOutflowPrincipal = monthlyPrincipalWithdrawn;
 
   const monthlyOutflowTotal =
@@ -210,7 +182,6 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Balance history from server */}
         <BalanceHistoryTable entries={balances} />
       </div>
     </DashboardLayout>
